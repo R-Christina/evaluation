@@ -1,0 +1,11 @@
+D:\evaluation\CommonModels\bin\Debug\net8.0\CommonModels.deps.json
+D:\evaluation\CommonModels\bin\Debug\net8.0\CommonModels.dll
+D:\evaluation\CommonModels\bin\Debug\net8.0\CommonModels.pdb
+D:\evaluation\CommonModels\obj\Debug\net8.0\CommonModels.GeneratedMSBuildEditorConfig.editorconfig
+D:\evaluation\CommonModels\obj\Debug\net8.0\CommonModels.AssemblyInfoInputs.cache
+D:\evaluation\CommonModels\obj\Debug\net8.0\CommonModels.AssemblyInfo.cs
+D:\evaluation\CommonModels\obj\Debug\net8.0\CommonModels.csproj.CoreCompileInputs.cache
+D:\evaluation\CommonModels\obj\Debug\net8.0\CommonModels.dll
+D:\evaluation\CommonModels\obj\Debug\net8.0\refint\CommonModels.dll
+D:\evaluation\CommonModels\obj\Debug\net8.0\CommonModels.pdb
+D:\evaluation\CommonModels\obj\Debug\net8.0\ref\CommonModels.dll

@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "kAHhyVF6e43yFXbwmcd5sdaa8u0FCPiaU5bOcqNFKog=",
+  "Source": "EvaluationService",
+  "BasePath": "_content/EvaluationService",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
