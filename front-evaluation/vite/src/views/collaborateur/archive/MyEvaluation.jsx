@@ -4,17 +4,19 @@ import FolderIcon from '@mui/icons-material/Folder';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import MainCard from 'ui-component/cards/MainCard';
 import { formulaireInstance } from '../../../axiosConfig';
+import { useNavigate } from 'react-router-dom';
 
 function MyEvaluation() {
   const [evaluationsByYear, setEvaluationsByYear] = useState([]);
   const user = JSON.parse(localStorage.getItem('user')) || {};
   const userId = user.id;
   const userType = user.typeUser;
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchEvaluations = async () => {
       try {
-        const response = await formulaireInstance.get(`/archive/annee/${userId}/${userType}`);
+        const response = await formulaireInstance.get(`/archive/years/${userId}`);
         if (response && response.data) {
           setEvaluationsByYear(response.data);
         } else {
@@ -25,10 +27,20 @@ function MyEvaluation() {
       }
     };
 
-    if (userId && userType) {
+    if (userId) {
       fetchEvaluations();
     }
-  }, [userId, userType]);
+  }, [userId]);
+
+  const handleEvaluationClick = (evalId) => {
+    if (userType === 'Cadre') {
+      navigate(`/archive/evaluationPhasesCadre/${userId}/${evalId}`);
+    } else if (userType === 'NonCadre') {
+      navigate(`/archive/evaluationPhasesNonCadre/${userId}/${evalId}`);
+    } else {
+      console.error('Invalid user type specified.');
+    }
+  };
 
   return (
     <Paper>
@@ -54,9 +66,10 @@ function MyEvaluation() {
                   padding: '10px 20px',
                   backgroundColor: '#E8EAF6',
                   '&:hover': {
-                    backgroundColor: '#e3eaf5', // Change la couleur de fond au survol
+                    backgroundColor: '#e3eaf5',
                   },
                 }}
+                onClick={() => handleEvaluationClick(evaluation.evalId)}
               >
                 <FolderIcon sx={{ fontSize: 24, color: 'rgb(57, 73, 171)', marginRight: '16px' }} />
                 <CardContent sx={{ flexGrow: 1, padding: 0 }}>

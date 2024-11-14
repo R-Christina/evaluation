@@ -20,5 +20,6 @@ namespace EvaluationService.Models
         public virtual FormTemplate Template { get; set; }
 
         public virtual ICollection<CompetenceLevel> CompetenceLevels { get; set; }
+        public virtual ICollection<UserCompetence> UserCompetences { get; set; }
     }
 }

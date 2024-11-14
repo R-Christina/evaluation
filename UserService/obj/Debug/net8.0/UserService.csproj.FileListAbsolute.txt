@@ -144,3 +144,4 @@ D:\evaluation\UserService\bin\Debug\net8.0\runtimes\osx\lib\net8.0\System.Direct
 D:\evaluation\UserService\bin\Debug\net8.0\runtimes\win\lib\net8.0\System.DirectoryServices.Protocols.dll
 D:\evaluation\UserService\bin\Debug\net8.0\CommonModels.dll
 D:\evaluation\UserService\bin\Debug\net8.0\CommonModels.pdb
+D:\evaluation\UserService\obj\Debug\net8.0\UserService.sourcelink.json

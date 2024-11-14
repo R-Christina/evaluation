@@ -46,7 +46,7 @@ const TotalStyledTableCell = styled(StyledTableCell)(({ theme }) => ({
 }));
 
 const Formulaire = () => {
-    const templateId = 2; // Définir templateId à 1
+    const templateId = 2;
     const navigate = useNavigate();
     const [formTemplate, setFormTemplate] = useState(null);
     const [dynamicColumns, setDynamicColumns] = useState([]);
@@ -86,14 +86,6 @@ const Formulaire = () => {
                         >
                             Modifier
                         </Button>
-                        {/* <Button
-                            variant="outlined"
-                            onClick={handleUseClick}
-                            startIcon={<PanToolAltIcon />}
-                            style={{ marginRight: 10 }}
-                        >
-                            Utiliser
-                        </Button> */}
                         <IconButton size="small">
                             <FileDownloadIcon color="primary" />
                         </IconButton>

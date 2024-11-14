@@ -19,6 +19,17 @@ namespace EvaluationService.Controllers
             _httpClientFactory = httpClientFactory;
         }
 
+        [HttpGet("{evalId}")]
+        public async Task<ActionResult<Evaluation>> GetEvaluationById(int evalId)
+        {
+            var evaluation = await _context.Evaluations.FirstOrDefaultAsync(e => e.EvalId == evalId);
+            if (evaluation == null)
+            {
+                return NotFound(new { Message = "Évaluation non trouvée." });
+            }
+            return Ok(evaluation);
+        }
+
         private async Task<List<UserDto>> GetUsersByTypeAsync(string type)
         {
             var client = _httpClientFactory.CreateClient("UserService");
@@ -73,6 +84,7 @@ namespace EvaluationService.Controllers
         }
 
 
+        [HttpGet("enCours/{evalId}/{userId}")]
         private async Task<int?> GetUserEvalIdAsync(int evalId, string userId)
         {
             var userEvaluation = await _context.UserEvaluations
@@ -271,6 +283,194 @@ namespace EvaluationService.Controllers
             }
         }
 
+//-----------------------------NonCadre---------------------------------------------------------------------------------------------------
 
+        [HttpPost("InsertFixationObjectifData")]
+        public async Task<IActionResult> InsertFixationObjectifData(string userId, string type, [FromBody] FixationObjectifDataDto fixationObjectifData)
+        {
+            if (!Enum.TryParse<FormType>(type, true, out var formType))
+            {
+                return BadRequest(new { Message = "Type d'évaluation invalide. Utilisez 'Cadre' ou 'NonCadre'." });
+            }
+
+            // Récupère l'ID de l'évaluation en cours pour le type spécifié
+            var evaluationId = await _context.Evaluations
+                .Where(e => e.EtatId == 2 && e.FormTemplate.Type == formType)
+                .Select(e => e.EvalId)
+                .FirstOrDefaultAsync();
+
+            // Vérifie si une évaluation en cours a été trouvée
+            if (evaluationId == 0)
+            {
+                return NotFound(new { Message = $"Aucune évaluation en cours pour le type {type}." });
+            }
+
+            // Récupère l'ID de l'évaluation utilisateur pour l'utilisateur spécifié
+            var userEvalId = await GetUserEvalIdAsync(evaluationId, userId);
+            if (userEvalId == null)
+            {
+                return NotFound(new { Message = "Évaluation utilisateur non trouvée." });
+            }
+
+            try
+            {
+                foreach (var competence in fixationObjectifData.Competences)
+                {
+                    var userCompetence = new UserCompetence
+                    {
+                        UserEvalId = userEvalId.Value,
+                        CompetenceId = competence.CompetenceId,
+                        Performance = competence.Performance
+                    };
+                    _context.UserCompetences.Add(userCompetence);
+
+                    var historyUserCompetence = new HistoryUserCompetenceFO
+                    {
+                        UserEvalId = userEvalId.Value,
+                        CompetenceName = competence.Name,
+                        Performance = competence.Performance
+                    };
+                    _context.HistoryUserCompetenceFOs.Add(historyUserCompetence);
+                }
+
+                foreach (var indicator in fixationObjectifData.Indicators)
+                {
+                    var userIndicator = new UserIndicator
+                    {
+                        UserEvalId = userEvalId.Value,
+                        IndicatorId = indicator.IndicatorId,
+                        Name = indicator.IndicatorName
+                    };
+                    _context.UserIndicators.Add(userIndicator);
+
+                    var historyUserIndicator = new HistoryUserIndicatorFO
+                    {
+                        UserEvalId = userEvalId.Value,
+                        Name = indicator.IndicatorName,
+                        ResultText = null,
+                        Result = null
+                    };
+                    _context.HistoryUserIndicatorFOs.Add(historyUserIndicator);
+                }
+
+                await _context.SaveChangesAsync();
+                return Ok("Data inserted successfully");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"An error occurred: {ex.Message}");
+            }
+        }
+
+        [HttpPost("UpdateMiParcoursData")]
+        public async Task<IActionResult> UpdateMiParcoursData(string userId, string type, [FromBody] MiParcoursDataDto miParcoursData)
+        {
+            if (!Enum.TryParse<FormType>(type, true, out var formType))
+            {
+                return BadRequest(new { Message = "Type d'évaluation invalide. Utilisez 'Cadre' ou 'NonCadre'." });
+            }
+
+            // Récupère l'ID de l'évaluation en cours pour le type spécifié
+            var evaluationId = await _context.Evaluations
+                .Where(e => e.EtatId == 2 && e.FormTemplate.Type == formType)
+                .Select(e => e.EvalId)
+                .FirstOrDefaultAsync();
+
+            // Vérifie si une évaluation en cours a été trouvée
+            if (evaluationId == 0)
+            {
+                return NotFound(new { Message = $"Aucune évaluation en cours pour le type {type}." });
+            }
+
+            // Récupère l'ID de l'évaluation utilisateur pour l'utilisateur spécifié
+            var userEvalId = await GetUserEvalIdAsync(evaluationId, userId);
+            if (userEvalId == null)
+            {
+                return NotFound(new { Message = "Évaluation utilisateur non trouvée." });
+            }
+
+            try
+            {
+                foreach (var competence in miParcoursData.Competences)
+                {
+                    var userCompetence = await _context.UserCompetences.FirstOrDefaultAsync(uc => uc.UserEvalId == userEvalId.Value && uc.CompetenceId == competence.CompetenceId);
+                    if (userCompetence != null)
+                    {
+                        userCompetence.Performance = competence.Performance;
+                        _context.UserCompetences.Update(userCompetence);
+                    }
+
+                    var historyUserCompetence = new HistoryUserCompetenceMP
+                    {
+                        UserEvalId = userEvalId.Value,
+                        CompetenceName = competence.Name,
+                        Performance = competence.Performance
+                    };
+                    _context.HistoryUserCompetenceMPs.Add(historyUserCompetence);
+                }
+
+                foreach (var indicator in miParcoursData.Indicators)
+                {
+                    var userIndicator = await _context.UserIndicators.FirstOrDefaultAsync(ui => ui.UserEvalId == userEvalId.Value && ui.IndicatorId == indicator.IndicatorId);
+                    if (userIndicator != null)
+                    {
+                        userIndicator.Name = indicator.IndicatorName;
+                        _context.UserIndicators.Update(userIndicator);
+                    }
+
+                    var userIndicatorResult = new UserIndicatorResult
+                    {
+                        UserIndicatorId = userIndicator.UserIndicatorId,
+                        ResultText = indicator.ResultText,
+                        Result = indicator.Result
+                    };
+                    _context.UserIndicatorResults.Add(userIndicatorResult);
+
+                    var historyUserIndicator = new HistoryUserIndicatorMP
+                    {
+                        UserEvalId = userEvalId.Value,
+                        Name = indicator.IndicatorName,
+                        ResultText = indicator.ResultText,
+                        Result = indicator.Result
+                    };
+                    _context.HistoryUserIndicatorMPs.Add(historyUserIndicator);
+                }
+
+                await _context.SaveChangesAsync();
+                return Ok("Data updated and inserted successfully for Mi-parcours");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"An error occurred: {ex.Message}");
+            }
+        }
+
+    }
+
+    public class FixationObjectifDataDto
+    {
+        public List<CompetenceDto> Competences { get; set; }
+        public List<IndicatorDto> Indicators { get; set; }
+    }
+
+    public class MiParcoursDataDto
+    {
+        public List<CompetenceDto> Competences { get; set; }
+        public List<IndicatorDto> Indicators { get; set; }
+    }
+
+    public class CompetenceDto
+    {
+        public int CompetenceId { get; set; }
+        public decimal Performance { get; set; }
+        public string Name { get; set; }
+    }
+
+    public class IndicatorDto
+    {
+        public int IndicatorId { get; set; }
+        public string IndicatorName { get; set; }
+        public string ResultText { get; set; }
+        public decimal Result { get; set; }
     }
 }

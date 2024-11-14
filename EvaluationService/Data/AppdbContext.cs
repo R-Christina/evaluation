@@ -21,18 +21,24 @@ namespace EvaluationService.Data
         public DbSet<Competence> Competences { get; set; }
         public DbSet<Level> Levels { get; set; }
         public DbSet<CompetenceLevel> CompetenceLevels { get; set; }
+        public DbSet<UserCompetence> UserCompetences {get; set;}
         public DbSet<UserIndicator> UserIndicators { get; set; }
         public DbSet<Indicator> Indicators { get; set; }
         public DbSet<UserIndicatorResult> UserIndicatorResults { get; set; }
         public DbSet<Help> Helps { get; set; }
         public DbSet<UserHelpContent> UserHelpContents { get; set; }
 
-        //history
+        //history cadre
         public DbSet<HistoryCFo> HistoryCFos { get; set; }
         public DbSet<HistoryCMp> HistoryCMps { get; set; }
         public DbSet<HistoryObjectiveColumnValuesFo> HistoryObjectiveColumnValuesFos { get; set; }
         public DbSet<HistoryObjectiveColumnValuesMp> HistoryObjectiveColumnValuesMps { get; set; }
 
+        //history Non cadre
+        public DbSet<HistoryUserCompetenceFO> HistoryUserCompetenceFOs { get; set; }
+        public DbSet<HistoryUserIndicatorFO> HistoryUserIndicatorFOs { get; set; }
+        public DbSet<HistoryUserCompetenceMP> HistoryUserCompetenceMPs { get; set; }
+        public DbSet<HistoryUserIndicatorMP> HistoryUserIndicatorMPs { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

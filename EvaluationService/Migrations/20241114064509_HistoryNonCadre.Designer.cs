@@ -4,6 +4,7 @@ using EvaluationService.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EvaluationService.Migrations
 {
     [DbContext(typeof(AppdbContext))]
-    partial class AppdbContextModelSnapshot : ModelSnapshot
+    [Migration("20241114064509_HistoryNonCadre")]
+    partial class HistoryNonCadre
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -315,9 +318,8 @@ namespace EvaluationService.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("HistoryUserCompetenceId"));
 
-                    b.Property<string>("CompetenceName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("CompetenceName")
+                        .HasColumnType("int");
 
                     b.Property<decimal>("Performance")
                         .HasColumnType("decimal(18,2)");
@@ -330,31 +332,6 @@ namespace EvaluationService.Migrations
                     b.HasIndex("UserEvalId");
 
                     b.ToTable("HistoryUserCompetenceFOs");
-                });
-
-            modelBuilder.Entity("EvaluationService.Models.HistoryUserCompetenceMP", b =>
-                {
-                    b.Property<int>("HistoryUserCompetenceId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("HistoryUserCompetenceId"));
-
-                    b.Property<string>("CompetenceName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<decimal>("Performance")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<int>("UserEvalId")
-                        .HasColumnType("int");
-
-                    b.HasKey("HistoryUserCompetenceId");
-
-                    b.HasIndex("UserEvalId");
-
-                    b.ToTable("HistoryUserCompetenceMPs");
                 });
 
             modelBuilder.Entity("EvaluationService.Models.HistoryUserIndicatorFO", b =>
@@ -384,36 +361,6 @@ namespace EvaluationService.Migrations
                     b.HasIndex("UserEvalId");
 
                     b.ToTable("HistoryUserIndicatorFOs");
-                });
-
-            modelBuilder.Entity("EvaluationService.Models.HistoryUserIndicatorMP", b =>
-                {
-                    b.Property<int>("HistoryUserIndicatorMPId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("HistoryUserIndicatorMPId"));
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<decimal>("Result")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("ResultText")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("UserEvalId")
-                        .HasColumnType("int");
-
-                    b.HasKey("HistoryUserIndicatorMPId");
-
-                    b.HasIndex("UserEvalId");
-
-                    b.ToTable("HistoryUserIndicatorMPs");
                 });
 
             modelBuilder.Entity("EvaluationService.Models.Indicator", b =>
@@ -619,6 +566,9 @@ namespace EvaluationService.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("UserIndicatorId"));
 
+                    b.Property<decimal?>("AttainmentPercentage")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<int>("IndicatorId")
                         .HasColumnType("int");
 
@@ -647,8 +597,8 @@ namespace EvaluationService.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ResultId"));
 
-                    b.Property<decimal>("Result")
-                        .HasColumnType("decimal(18,2)");
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("int");
 
                     b.Property<string>("ResultText")
                         .IsRequired()
@@ -806,29 +756,7 @@ namespace EvaluationService.Migrations
                     b.Navigation("UserEvaluation");
                 });
 
-            modelBuilder.Entity("EvaluationService.Models.HistoryUserCompetenceMP", b =>
-                {
-                    b.HasOne("EvaluationService.Models.UserEvaluation", "UserEvaluation")
-                        .WithMany()
-                        .HasForeignKey("UserEvalId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("UserEvaluation");
-                });
-
             modelBuilder.Entity("EvaluationService.Models.HistoryUserIndicatorFO", b =>
-                {
-                    b.HasOne("EvaluationService.Models.UserEvaluation", "UserEvaluation")
-                        .WithMany()
-                        .HasForeignKey("UserEvalId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("UserEvaluation");
-                });
-
-            modelBuilder.Entity("EvaluationService.Models.HistoryUserIndicatorMP", b =>
                 {
                     b.HasOne("EvaluationService.Models.UserEvaluation", "UserEvaluation")
                         .WithMany()

@@ -15,6 +15,7 @@ const Remplissage = () => {
   const [isValidated, setIsValidated] = useState(false);
   const [evalId, setEvalId] = useState(null);
   const [fixationObjectives, setFixationObjectives] = useState([]);
+  const [missingResultsWarning, setMissingResultsWarning] = useState(false);
 
   useEffect(() => {
     if (userType === 'Cadre') {
@@ -119,7 +120,7 @@ const Remplissage = () => {
         priorityId: priority.templatePriorityId,
         priorityName: priority.name,
         description: objective.description || 'N/A',
-        weighting: parseFloat(objective.weighting) || 1,
+        weighting: parseFloat(objective.weighting) || 0,
         resultIndicator: objective.resultIndicator || 'N/A',
         result: objective.result || 0,
         dynamicColumns: objective.dynamicColumns
@@ -130,6 +131,13 @@ const Remplissage = () => {
           : []
       }))
     );
+
+    // Check for missing results
+    const missingResults = objectivesData.some((obj) => obj.description !== 'N/A' && obj.result === 0);
+    if (missingResults) {
+      setMissingResultsWarning(true);
+      return;
+    }
 
     console.log("Data being sent to the backend:", objectivesData); // Log data for debugging
 
@@ -192,6 +200,12 @@ const Remplissage = () => {
           </Grid>
         </Grid>
 
+        {missingResultsWarning && (
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            Certains objectifs ont été définis sans résultats correspondants. Veuillez vérifier et compléter les résultats avant de valider.
+          </Alert>
+        )}
+
         {template.templateStrategicPriorities.map((priority, priorityIndex) => {
           const currentObjectiveIndex = objectiveIndices[priorityIndex];
           const currentObjective = priority.objectives[currentObjectiveIndex];
@@ -201,7 +215,7 @@ const Remplissage = () => {
 
           return (
             <MainCard key={priority.templatePriorityId} sx={{ mt: 3, p: 2, backgroundColor: '#E8EAF6' }}>
-              <Typography variant="h5" sx={{mb:3}} gutterBottom>
+              <Typography variant="h5" sx={{ mb: 3 }} gutterBottom>
                 {priority.name}
               </Typography>
 
@@ -215,7 +229,7 @@ const Remplissage = () => {
                   style={{ marginBottom: '1rem' }}
                 >
                   <Box>
-                  {matchingObjective ? (
+                    {matchingObjective ? (
                       <>
                         <Box mb={0} p={1.5} sx={{ backgroundColor: '#fffaf1', borderRadius: 1, borderLeft: '4px solid #FB8C00' }}>
                           <Typography variant="subtitle2" color="textSecondary" sx={{ fontWeight: 'bold' }}>
@@ -408,7 +422,7 @@ const Remplissage = () => {
                           </IconButton>
                         </Box>
                       </>
-                      )}
+                    )}
                   </Box>
                 </motion.div>
               </AnimatePresence>

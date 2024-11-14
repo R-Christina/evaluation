@@ -164,7 +164,6 @@ CREATE TABLE HistoryUserCompetencesFO (
     user_eval_id INT NOT NULL,
     competence_name INT NOT NULL,
     performance DECIMAL(5,2),
-    FOREIGN KEY (competence_id) REFERENCES Competences(competence_id),
     FOREIGN KEY (user_eval_id) REFERENCES UserEvaluations(user_eval_id)
 );
 
@@ -173,7 +172,6 @@ CREATE TABLE HistoryUserCompetencesMP (
     user_eval_id INT NOT NULL,
     competence_name INT NOT NULL,
     performance DECIMAL(5,2),
-    FOREIGN KEY (competence_id) REFERENCES Competences(competence_id),
     FOREIGN KEY (user_eval_id) REFERENCES UserEvaluations(user_eval_id)
 );
 
@@ -193,7 +191,6 @@ CREATE TABLE UserIndicators (
     FOREIGN KEY (user_eval_id) REFERENCES UserEvaluations(user_eval_id),
     FOREIGN KEY (indicator_id) REFERENCES Indicators(indicator_id)
 );
-
 
 CREATE TABLE UserIndicatorResults (
     result_id INT PRIMARY KEY AUTO_INCREMENT,

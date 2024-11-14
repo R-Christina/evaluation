@@ -44,6 +44,9 @@ const EditFormulaireNonCadre = Loadable(lazy(() => import('views/rh/formulaire/n
 const Remplissage = Loadable(lazy(() => import('views/collaborateur/evaluation/cadre/Remplissage')));
 const RemplissageNonCadre = Loadable(lazy(() => import('views/collaborateur/evaluation/nonCadre/Remplissage')));
 const MyEvaluation = Loadable(lazy(() => import('views/collaborateur/archive/MyEvaluation')));
+const EvaluationPhases = Loadable(lazy(() => import('views/collaborateur/archive/EvaluationPhases')));
+const EvaluationPhasesCadre = Loadable(lazy(() => import('views/collaborateur/archive/cadre/EvaluationPhasesCadre')));
+
 
 // sample page routing
 // const SamplePage = Loadable(lazy(() => import('views/sample-page')));
@@ -286,6 +289,15 @@ const MainRoutes = {
         {
           path: 'myEvaluation',
           element: <MyEvaluation />
+        }
+      ]
+    },
+    {
+      path: 'archive',
+      children: [
+        {
+          path: 'evaluationPhasesCadre/:userId/:evalId',
+          element: <EvaluationPhasesCadre />
         }
       ]
     }

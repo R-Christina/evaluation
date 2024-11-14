@@ -357,7 +357,7 @@ GO
 
 --maka ny fixation sy mi-parcours d'une année
 DECLARE @UserId NVARCHAR(MAX) = '18219f8e-b781-46ff-9182-37c9da640c03' -- Remplacez par l'ID utilisateur
-DECLARE @EvalAnnee INT = 2024 -- Remplacez par l'année d'évaluation souhaitée
+DECLARE @EvalId INT = 4 -- Remplacez par l'ID d'évaluation souhaité
 
 SELECT 
     'Fixation' AS Phase,
@@ -377,7 +377,7 @@ JOIN
     Evaluations e ON ue.EvalId = e.EvalId
 WHERE 
     ue.UserId = @UserId
-    AND e.EvalAnnee = @EvalAnnee
+    AND e.EvalId = @EvalId
 
 UNION ALL
 
@@ -399,7 +399,7 @@ JOIN
     Evaluations e ON ue.EvalId = e.EvalId
 WHERE 
     ue.UserId = @UserId
-    AND e.EvalAnnee = @EvalAnnee
+    AND e.EvalId = @EvalId
 ORDER BY 
     Phase, Date;
 
@@ -410,3 +410,6 @@ FROM [Evaluations] E
 JOIN [UserEvaluations] U ON E.EvalId = U.EvalId
 WHERE E.EtatId = 3
 AND U.UserId = '18219f8e-b781-46ff-9182-37c9da640c03';
+
+-- rudy: 4bbe3a90-2f91-40b9-bdb2-6efc48195f3a
+

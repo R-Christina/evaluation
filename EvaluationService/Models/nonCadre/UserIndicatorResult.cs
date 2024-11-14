@@ -11,10 +11,11 @@ namespace EvaluationService.Models
         [Required]
         public int UserIndicatorId { get; set; }
 
-        [Range(1, 3)]
-        public int LineNumber { get; set; }
-
+        [Required]        
         public string ResultText { get; set; }
+
+        [Required]
+        public decimal Result {get; set;}
 
         // Foreign Key and Navigation Property
         [ForeignKey("UserIndicatorId")]

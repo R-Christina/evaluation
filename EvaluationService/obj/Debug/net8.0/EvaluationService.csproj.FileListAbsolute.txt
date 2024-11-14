@@ -143,3 +143,4 @@ D:\evaluation\evaluationService\bin\Debug\net8.0\zh-Hans\Microsoft.CodeAnalysis.
 D:\evaluation\evaluationService\bin\Debug\net8.0\zh-Hant\Microsoft.CodeAnalysis.Workspaces.resources.dll
 D:\evaluation\EvaluationService\bin\Debug\net8.0\CommonModels.dll
 D:\evaluation\EvaluationService\bin\Debug\net8.0\CommonModels.pdb
+D:\evaluation\EvaluationService\obj\Debug\net8.0\EvaluationService.sourcelink.json

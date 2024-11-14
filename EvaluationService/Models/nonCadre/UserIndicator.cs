@@ -16,9 +16,6 @@ namespace EvaluationService.Models
         [MaxLength(255)]
         public string Name { get; set; }
 
-        [Range(0.0, 100.0)]
-        public decimal? AttainmentPercentage { get; set; }
-
         // Foreign Key to Indicator
         [Required]
         public int IndicatorId { get; set; }
