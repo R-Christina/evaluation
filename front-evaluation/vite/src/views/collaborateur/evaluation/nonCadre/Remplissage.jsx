@@ -6,6 +6,7 @@ import MainCard from 'ui-component/cards/MainCard';
 const Remplissage = () => {
   const user = JSON.parse(localStorage.getItem('user')) || {};
   const userId = user.id;
+  const userType = user.typeUser;
   
   const [formTemplate, setFormTemplate] = useState(null);
   const [templateId, setTemplateId] = useState(null);
@@ -168,6 +169,17 @@ const Remplissage = () => {
       setLoading(false);
     }
   };
+
+  if (userType !== 'NonCadre') {
+    return (
+      <Box display="flex" justifyContent="center" p={20}>
+        <Alert severity="error">
+          <Typography variant="h5">Accès Refusé</Typography>
+          <Typography variant="body1">Seuls les utilisateurs Cadre peuvent accéder à cette page.</Typography>
+        </Alert>
+      </Box>
+    );
+  }
 
   if (!hasOngoingEvaluation) {
     return (

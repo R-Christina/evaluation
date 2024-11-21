@@ -124,7 +124,7 @@ const Formulaire = () => {
 
   const fetchAllPriorities = async () => {
     try {
-      const response = await formulaireInstance.get('/Template/GetAllPriorities?onlyActive=false');
+      const response = await formulaireInstance.get('/Template/GetAllPriorities');
       setEditedPriorities(
         response.data.map((priority) => ({
           templatePriorityId: priority.templatePriorityId,
@@ -387,7 +387,7 @@ const Formulaire = () => {
         <Grid container alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
           <Grid item>
             <Typography variant="subtitle2">Formulaire Cadre</Typography>
-            <Typography variant="h3" onClick={handleEditClick} sx={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
+            <Typography variant="h3"sx={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
               Formulaire d’évaluation
             </Typography>
           </Grid>
@@ -438,11 +438,9 @@ const Formulaire = () => {
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
                 <Typography variant="body1">Nom :</Typography>
-                <Typography variant="body1">Prénom :</Typography>
                 <Typography variant="body1">Matricule :</Typography>
                 <Typography variant="body1">Poste :</Typography>
                 <Typography variant="body1">Département :</Typography>
-                <Typography variant="body1">Direction :</Typography>
               </Paper>
             </Grid>
             <Grid item xs={6}>
@@ -452,7 +450,6 @@ const Formulaire = () => {
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
                 <Typography variant="body1">Nom :</Typography>
-                <Typography variant="body1">Prénom :</Typography>
               </Paper>
             </Grid>
           </Grid>

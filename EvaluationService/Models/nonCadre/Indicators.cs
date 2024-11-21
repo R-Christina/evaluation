@@ -14,6 +14,7 @@ namespace EvaluationService.Models
         [Range(1, 3)]
         public int MaxResults { get; set; } = 3;
         public int TemplateId { get; set; }
+        public bool IsActive { get; set; } = true;
 
         // Navigation properties
         [ForeignKey("TemplateId")]

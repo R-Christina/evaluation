@@ -4,6 +4,7 @@ using EvaluationService.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
+using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
 
 namespace EvaluationService.Controllers
@@ -213,7 +214,6 @@ namespace EvaluationService.Controllers
         }
 
 
-        // PUT: api/FormTemplate/UpdatePriority
         [HttpPut("UpdatePriority")]
         public async Task<IActionResult> UpdateStrategicPriority([FromBody] UpdatePriorityRequest request)
         {
@@ -322,71 +322,6 @@ namespace EvaluationService.Controllers
         }
 
 
-        // [HttpGet("NonCadreTemplate/{templateId:int}")]
-        // public async Task<IActionResult> GetNonCadreTemplate(int templateId)
-        // {
-        //     try
-        //     {
-        //         var template = await _context.FormTemplates
-        //             .Where(t => t.TemplateId == templateId && t.Type == FormType.NonCadre)
-        //             .Include(t => t.Competences)
-        //                 .ThenInclude(c => c.CompetenceLevels)
-        //             .FirstOrDefaultAsync();
-
-        //         if (template == null)
-        //         {
-        //             return NotFound("Le modèle de type NonCadre avec cet ID n'existe pas.");
-        //         }
-
-        //         var helps = await _context.Helps.ToListAsync();
-
-        //         var levels = await _context.Levels.Select(l => new
-        //         {
-        //             l.LevelId,
-        //             l.LevelName
-        //         }).ToListAsync();
-
-        //         var indicators = await _context.Indicators
-        //             .Where(i => i.TemplateId == templateId) 
-        //             .Select(i => new
-        //             {
-        //                 i.IndicatorId,
-        //                 i.MaxResults,
-        //                 i.label
-        //             }).ToListAsync();
-
-        //         var result = new
-        //         {
-        //             TemplateId = template.TemplateId,
-        //             Name = template.Name,
-        //             CreationDate = template.CreationDate,
-        //             Competences = template.Competences.Select(c => new
-        //             {
-        //                 c.CompetenceId,
-        //                 c.Name,
-        //                 Levels = c.CompetenceLevels.Select(cl => new
-        //                 {
-        //                     cl.LevelId,
-        //                     cl.Description
-        //                 })
-        //             }),
-        //             Helps = helps.Select(h => new
-        //             {
-        //                 h.HelpId,
-        //                 h.Name
-        //             }),
-        //             Levels = levels,
-        //             Indicators = indicators
-        //         };
-
-        //         return Ok(result);
-        //     }
-        //     catch (Exception ex)
-        //     {
-        //         return StatusCode(500, "Erreur du serveur : " + ex.Message);
-        //     }
-        // }
-
         [HttpGet("NonCadreTemplate/{templateId:int}")]
         public async Task<IActionResult> GetNonCadreTemplate(int templateId)
         {
@@ -415,7 +350,7 @@ namespace EvaluationService.Controllers
                 }).ToListAsync();
 
                 var indicators = await _context.Indicators
-                    .Where(i => i.TemplateId == templateId) 
+                    .Where(i => i.TemplateId == templateId && i.IsActive) // Filtrer les indicateurs actifs
                     .Select(i => new
                     {
                         i.IndicatorId,
@@ -480,6 +415,197 @@ namespace EvaluationService.Controllers
             }
         }
 
+        [HttpPut("UpdateNonCadreTemplateName")]
+        public async Task<IActionResult> UpdateNonCadreTemplateName([FromBody] string newName)
+        {
+            try
+            {
+                // Rechercher le template 'Cadre' par son type
+                var NonCadreTemplate = await _context.FormTemplates
+                    .FirstOrDefaultAsync(t => t.Type == FormType.NonCadre);
+
+                if (NonCadreTemplate == null)
+                {
+                    return NotFound("Cadre template not found.");
+                }
+
+                // Mettre à jour le nom du template
+                NonCadreTemplate.Name = newName;
+
+                // Sauvegarder les modifications
+                await _context.SaveChangesAsync();
+                return Ok("Cadre template name updated successfully.");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
+        [HttpPost("addIndicator")]
+        public async Task<IActionResult> AddIndicator([FromBody] AddIndicatorRequest request)
+        {
+            try
+            {
+                // Vérifie si le template existe
+                var template = await _context.FormTemplates.FindAsync(request.TemplateId);
+                if (template == null)
+                {
+                    return NotFound(new { Message = "Template not found" });
+                }
+
+                // Crée un nouvel indicateur
+                var newIndicator = new Indicator
+                {
+                    label = request.Label,
+                    MaxResults = request.MaxResults,
+                    TemplateId = request.TemplateId,
+                    IsActive = true
+                };
+
+                // Ajoute l'indicateur à la base de données
+                _context.Indicators.Add(newIndicator);
+                await _context.SaveChangesAsync();
+
+                return Ok(new { Message = "Indicator added successfully", IndicatorId = newIndicator.IndicatorId });
+            }
+            catch (Exception ex)
+            {
+                // Gestion des erreurs
+                return StatusCode(500, new { Message = $"Error: {ex.Message}" });
+            }
+        }
+
+        [HttpPut("UpdateIndicators")]
+        public async Task<IActionResult> UpdateIndicators([FromBody] List<UpdateIndicatorRequest> requests)
+        {
+            if (requests == null || !requests.Any())
+            {
+                return BadRequest(new { Message = "Aucun indicateur à mettre à jour." });
+            }
+
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                foreach (var req in requests)
+                {
+                    var indicator = await _context.Indicators.FindAsync(req.IndicatorId);
+                    if (indicator == null)
+                    {
+                        return NotFound(new { Message = $"Indicateur avec ID {req.IndicatorId} non trouvé." });
+                    }
+
+                    // Mise à jour des propriétés de l'indicateur
+                    indicator.label = req.NewLabel;
+                    indicator.MaxResults = req.NewMaxResults;
+                    indicator.IsActive = req.IsActive;
+
+                    _context.Indicators.Update(indicator);
+                }
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return Ok(new { Message = "Tous les indicateurs ont été mis à jour avec succès." });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return StatusCode(500, new { Message = $"Erreur du serveur : {ex.Message}" });
+            }
+        }
+
+        [HttpGet("AllIndicator")]
+        public async Task<IActionResult> GetIndicators([FromQuery] bool? onlyActive = null)
+        {
+            try
+            {
+                // Construire la requête de base
+                IQueryable<Indicator> query = _context.Indicators;
+
+                // Appliquer le filtre si onlyActive est vrai
+                if (onlyActive.HasValue && onlyActive.Value)
+                {
+                    query = query.Where(i => i.IsActive);
+                }
+
+                // Exécuter la requête et récupérer les résultats
+                List<Indicator> indicators = await query.ToListAsync();
+
+                return Ok(indicators);
+            }
+            catch (Exception ex)
+            {
+                // Retourner une erreur 500 en cas d'exception
+                return StatusCode(500, new { Message = $"Erreur du serveur : {ex.Message}" });
+            }
+        }
+
+        // [HttpPut("updateIndicator/{id}")]
+        // public async Task<IActionResult> UpdateIndicator(int id, [FromBody] UpdateIndicatorRequest request)
+        // {
+        //     try
+        //     {
+        //         // Rechercher l'indicateur à modifier
+        //         var indicator = await _context.Indicators.FindAsync(id);
+        //         if (indicator == null)
+        //         {
+        //             return NotFound(new { Message = "Indicator not found" });
+        //         }
+
+        //         // Mettre à jour toutes les propriétés
+        //         indicator.label = request.NewLabel;
+        //         indicator.MaxResults = request.NewMaxResults;
+        //         indicator.IsActive = request.IsActive;
+
+        //         // Sauvegarder les modifications dans la base de données
+        //         _context.Indicators.Update(indicator);
+        //         await _context.SaveChangesAsync();
+
+        //         return Ok(new { Message = "Indicator updated successfully" });
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         // Gestion des erreurs
+        //         return StatusCode(500, new { Message = $"Error: {ex.Message}" });
+        //     }
+        // }
+
+        [HttpPut("updateWeights")]
+        public async Task<IActionResult> UpdateWeights([FromBody] UpdateWeightRequest request)
+        {
+            try
+            {
+                // Vérifiez si le modèle existe
+                var userEvaluationWeights = await _context.UserEvaluationWeights
+                    .FirstOrDefaultAsync(w => w.TemplateId == request.TemplateId);
+
+                if (userEvaluationWeights == null)
+                {
+                    return NotFound(new { Message = "Template with the specified ID not found." });
+                }
+
+                // Mise à jour des poids
+                userEvaluationWeights.CompetenceWeightTotal = request.CompetenceWeightTotal;
+                userEvaluationWeights.IndicatorWeightTotal = request.IndicatorWeightTotal;
+
+                // Sauvegarder les changements dans la base de données
+                _context.UserEvaluationWeights.Update(userEvaluationWeights);
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    Message = "Weights updated successfully.",
+                    CompetenceWeightTotal = userEvaluationWeights.CompetenceWeightTotal,
+                    IndicatorWeightTotal = userEvaluationWeights.IndicatorWeightTotal
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = $"Server error: {ex.Message}" });
+            }
+        }
+
 
         [HttpGet("GetAllTemplates")]
         public async Task<ActionResult<IEnumerable<FormTemplateDto>>> GetAllTemplates()
@@ -498,6 +624,7 @@ namespace EvaluationService.Controllers
         }
     }
 
+//cadre
     public class DynamicColumnUpdateDto
     {
         public int Id { get; set; } // Cet ID peut être supprimé si on ne souhaite pas l'envoyer depuis le client
@@ -518,4 +645,35 @@ namespace EvaluationService.Controllers
         public int NewMaxObjectives { get; set; }
         public bool IsActif {get; set;}
     }
+
+//NonCadre
+    public class AddIndicatorRequest
+    {
+        [Required]
+        public int TemplateId { get; set; }
+
+        [Required]
+        public string Label { get; set; }
+
+        [Range(1, 3)]
+        public int MaxResults { get; set; }
+    }
+
+    public class UpdateIndicatorRequest
+    {
+        public int IndicatorId {get; set;}
+        public string NewLabel { get; set; }
+        [Range(1, 3)]
+        public int NewMaxResults { get; set; }
+        public bool IsActive {get; set;}
+    }
+
+    public class UpdateWeightRequest
+    {
+        [Required]
+        public int TemplateId { get; set; }
+        public int CompetenceWeightTotal { get; set; }
+        public int IndicatorWeightTotal { get; set; }
+    }
+
 }

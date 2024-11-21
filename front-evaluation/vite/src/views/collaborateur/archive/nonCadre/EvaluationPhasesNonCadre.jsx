@@ -274,10 +274,10 @@ function EvaluationPhasesNonCadre() {
                   ))}
                   {/* Ligne de somme pour chaque indicatorName */}
                   <TableRow>
-                    <StyledTableCell colSpan={1} sx={{ fontWeight: 'bold' }}>
+                    <StyledTableCell colSpan={1} sx={{ fontWeight: 'bold', backgroundColor: '#E8EAF6' }}>
                       Total
                     </StyledTableCell>
-                    <StyledTableCell sx={{ fontWeight: 'bold' }}>
+                    <StyledTableCell sx={{ fontWeight: 'bold', backgroundColor: '#E8EAF6'}}>
                       {indicatorsSum.find(sum => sum.name === indicatorName)?.totalResult !== undefined
                         ? `${indicatorsSum.find(sum => sum.name === indicatorName).totalResult}%`
                         : '- '}

@@ -37,7 +37,6 @@ const ListeEval = Loadable(lazy(() => import('views/rh/evaluation/Liste')));
 const AjoutEval = Loadable(lazy(() => import('views/rh/evaluation/Ajout')));
 const FormulaireCadre = Loadable(lazy(() => import('views/rh/formulaire/cadre/Formulaire')));
 const FormulaireNonCadre = Loadable(lazy(() => import('views/rh/formulaire/nonCadre/index')));
-const EditFormulaireNonCadre = Loadable(lazy(() => import('views/rh/formulaire/nonCadre/EditFormNonCadre')));
 
 // collab
 const Remplissage = Loadable(lazy(() => import('views/collaborateur/evaluation/cadre/Remplissage')));
@@ -241,16 +240,6 @@ const MainRoutes = {
         {
           path: 'home',
           element: <FormulaireNonCadre />
-        }
-      ]
-    },
-
-    {
-      path: 'formulaireNonCadre',
-      children: [
-        {
-          path: 'edit',
-          element: <EditFormulaireNonCadre />
         }
       ]
     },
