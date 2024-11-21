@@ -1,24 +1,33 @@
 import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Box, Typography, TextField, IconButton, Paper, Grid, Alert, Button } from '@mui/material';
-import { KeyboardArrowLeft, KeyboardArrowRight } from '@mui/icons-material';
+import { Box, Typography, TextField, Paper, Grid, Alert, Button } from '@mui/material';
 import { formulaireInstance } from '../../../../axiosConfig';
 import MainCard from 'ui-component/cards/MainCard';
 
 const Remplissage = () => {
-  const [templateId, setTemplateId] = useState(null);
+  const user = JSON.parse(localStorage.getItem('user')) || {};
+  const userId = user.id;
+  
   const [formTemplate, setFormTemplate] = useState(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [performanceValues, setPerformanceValues] = useState({});
-  const [indicatorValues, setIndicatorValues] = useState([]);
+  const [templateId, setTemplateId] = useState(null);
+  const [indicatorValues, setIndicatorValues] = useState({});
   const [hasOngoingEvaluation, setHasOngoingEvaluation] = useState(false);
   const [currentPeriod, setCurrentPeriod] = useState('');
+  const [evalId, setEvalId] = useState(null);
+  const [errorMessage, setErrorMessage] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null); // Nouvel état pour les messages de succès
 
+  // États pour Mi-Parcours
+  const [competences, setCompetences] = useState([]);
+  const [indicators, setIndicators] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [dataError, setDataError] = useState(null);
+
+  // Récupérer le template initial et les informations d'évaluation en cours
   useEffect(() => {
-    const fetchInitialTemplate = async () => {
+    const fetchInitialData = async () => {
       try {
-        const response = await formulaireInstance.get('/Template/NonCadreTemplate');
-        const { templateId } = response.data;
+        const templateResponse = await formulaireInstance.get('/Template/NonCadreTemplate');
+        const { templateId } = templateResponse.data;
         setTemplateId(templateId);
 
         const evaluationResponse = await formulaireInstance.get('/Periode/enCours', {
@@ -27,8 +36,12 @@ const Remplissage = () => {
         setHasOngoingEvaluation(evaluationResponse.data.length > 0);
 
         if (evaluationResponse.data.length > 0) {
-          const detailedResponse = await formulaireInstance.get(`/Template/NonCadreTemplate/${templateId}`);
-          setFormTemplate(detailedResponse.data);
+          const firstEvaluation = evaluationResponse.data[0];
+          const currentEvalId = firstEvaluation.evalId || firstEvaluation.id || null;
+          setEvalId(currentEvalId);
+
+          const detailedTemplateResponse = await formulaireInstance.get(`/Template/NonCadreTemplate/${templateId}`);
+          setFormTemplate(detailedTemplateResponse.data);
 
           const periodResponse = await formulaireInstance.get('/Periode/periodeActel', {
             params: { type: 'NonCadre' }
@@ -38,46 +51,134 @@ const Remplissage = () => {
           }
         }
       } catch (error) {
-        console.error('Error fetching template or evaluation data:', error);
+        setErrorMessage('Erreur lors du chargement des données initiales.');
       }
     };
-    fetchInitialTemplate();
+
+    fetchInitialData();
   }, []);
 
-  const handlePerformanceChange = (competenceId, value) => {
-    setPerformanceValues((prev) => ({
+  // Récupérer les données Mi-Parcours
+  useEffect(() => {
+    const fetchMiParcoursData = async () => {
+      if (currentPeriod === 'Mi-Parcours' && evalId && userId) {
+        setLoading(true);
+        setDataError(null);
+        setErrorMessage(null);
+        setSuccessMessage(null);
+
+        try {
+          const [competencesResponse, indicatorsResponse] = await Promise.all([
+            formulaireInstance.get(`/Evaluation/${evalId}/competences/${userId}`),
+            formulaireInstance.get(`/Evaluation/${evalId}/indicators/${userId}`)
+          ]);
+
+          setCompetences(Array.isArray(competencesResponse.data) ? competencesResponse.data : []);
+          setIndicators(Array.isArray(indicatorsResponse.data) ? indicatorsResponse.data : []);
+        } catch (error) {
+          const backendErrorMessage = error.response?.data?.Message || 'Erreur lors de la récupération des données Mi-Parcours.';
+          setDataError(backendErrorMessage);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchMiParcoursData();
+  }, [currentPeriod, evalId, userId]);
+
+  const handleIndicatorLabelChange = (indicatorId, value) => {
+    setIndicatorValues((prev) => ({
       ...prev,
-      [competenceId]: value
+      [indicatorId]: {
+        ...prev[indicatorId],
+        label: value
+      }
     }));
   };
 
-  const handleIndicatorChange = (index, field, value) => {
-    const updatedIndicators = [...indicatorValues];
-    if (!updatedIndicators[index]) updatedIndicators[index] = { label: '', results: ['', '', ''] };
-    if (field === 'label') {
-      updatedIndicators[index].label = value;
-    } else {
-      const resultIndex = parseInt(field.split('_')[1], 10);
-      updatedIndicators[index].results[resultIndex] = value;
-    }
-    setIndicatorValues(updatedIndicators);
+  const handleIndicatorChange = (indicatorId, field, value) => {
+    setIndicatorValues((prev) => ({
+      ...prev,
+      [indicatorId]: {
+        ...prev[indicatorId],
+        [field]: value
+      }
+    }));
   };
 
-  const handleNext = () => {
-    if (currentIndex < (formTemplate?.competences?.length || 0) - 1) {
-      setCurrentIndex(currentIndex + 1);
+  const handleSubmitFixationObjectif = async () => {
+    if (!formTemplate) {
+      setErrorMessage('Le formulaire n\'est pas chargé.');
+      return;
+    }
+
+    const indicatorsToSubmit = formTemplate.indicators.map((indicator) => {
+      const indValue = indicatorValues[indicator.indicatorId] || {};
+      return {
+        indicatorId: indicator.indicatorId,
+        indicatorName: indValue.label || indicator.name || 'N/A',
+        resultText: 'N/A', // Fixé à "N/A"
+        result: 0 // Fixé à 0
+      };
+    });
+
+    try {
+      await formulaireInstance.post('/Evaluation/ValidateIndicator', indicatorsToSubmit, {
+        params: {
+          userId: userId,
+          type: 'NonCadre'
+        }
+      });
+      setSuccessMessage('Indicateurs soumis avec succès pour la période Fixation Objectif.');
+      setErrorMessage(null);
+    } catch (error) {
+      const backendErrorMessage = error.response?.data?.Message || 'Une erreur inconnue est survenue.';
+      setErrorMessage(backendErrorMessage);
     }
   };
 
-  const handleBack = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
+  // Fonction pour archiver les données Mi-Parcours
+  const handleArchiveMiParcours = async () => {
+    if (!evalId || !userId) {
+      setErrorMessage('Identifiant d\'évaluation ou utilisateur manquant.');
+      return;
+    }
+
+    setLoading(true);
+    setDataError(null);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      await formulaireInstance.post('/Evaluation/ArchiveMiParcoursData', null, {
+        params: {
+          userId: userId,
+          type: 'NonCadre' // ou 'Cadre' selon le contexte
+        }
+      });
+
+      setSuccessMessage('Données Mi-Parcours archivées avec succès.');
+      // Optionnel : Actualiser les données ou rediriger
+      // window.location.reload();
+    } catch (error) {
+      const backendErrorMessage = error.response?.data?.Message || 'Une erreur est survenue lors de l\'archivage.';
+      setDataError(backendErrorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
   if (!hasOngoingEvaluation) {
     return (
-      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" textAlign="center" p={20}>
+      <Box
+        display="flex"
+        flexDirection="column"
+        alignItems="center"
+        justifyContent="center"
+        textAlign="center"
+        p={20}
+      >
         <Alert severity="info" sx={{ mb: 2 }}>
           <Typography variant="h4">Aucune évaluation en cours</Typography>
           <Typography variant="body1">Vous recevrez une notification lors du commencement.</Typography>
@@ -90,164 +191,158 @@ const Remplissage = () => {
   }
 
   if (!formTemplate) {
-    return <Typography>Chargement...</Typography>;
+    return <Typography>Chargement...</Typography>
   }
-
-  const currentCompetence = formTemplate?.competences?.[currentIndex];
-  const isObjectiveSettingPeriod = currentPeriod === 'Fixation Objectif';
 
   return (
     <Paper>
       <MainCard>
         <Grid container alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
           <Grid item>
-            <Typography variant="subtitle2">Évaluation des compétences</Typography>
+            <Typography variant="subtitle2">Évaluation des indicateurs</Typography>
             <Typography variant="h3">
               Période : <span style={{ color: '#3949AB' }}>{currentPeriod}</span>
             </Typography>
           </Grid>
         </Grid>
 
-        <MainCard
-          maxWidth="md"
-          sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', pt: 4, pb: 4, mt: 3, backgroundColor: '#E8EAF6', p: 2 }}
-        >
-          <AnimatePresence mode="wait">
-            {currentCompetence && (
-              <motion.div
-                key={currentCompetence.competenceId}
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -50 }}
-                transition={{ duration: 0.4 }}
-                style={{ width: '100%', textAlign: 'center' }}
-              >
-                <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#3949AB', mb: 3 }}>
-                  {currentCompetence.name}
-                </Typography>
+        {errorMessage && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {errorMessage}
+          </Alert>
+        )}
 
-                <Box
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: 3,
-                    mb: 4
-                  }}
-                >
-                  {formTemplate.levels.map((level) => {
-                    const competenceLevel = currentCompetence.levels?.find((cl) => cl.levelId === level.levelId);
-                    return (
-                      <Box
-                        key={level.levelId}
-                        sx={{
-                          p: 3,
-                          borderRadius: 2,
-                          backgroundColor: '#FFFFFF',
-                          border: '1px solid #E5E7EB',
-                          textAlign: 'left',
-                          transition: 'background-color 0.3s ease',
-                          '&:hover': { backgroundColor: '#F0F4F8' }
-                        }}
-                      >
-                        <Typography variant="subtitle1" sx={{ fontWeight: '600', color: '#3949AB' }}>
-                          Niveau : {level.levelName}%
-                        </Typography>
-                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                          {competenceLevel ? competenceLevel.description : 'Description non disponible'}
-                        </Typography>
-                      </Box>
-                    );
-                  })}
-                </Box>
+        {successMessage && (
+          <Alert severity="success" sx={{ mb: 3 }}>
+            {successMessage}
+          </Alert>
+        )}
 
-                <TextField
-                  label="Performance en %"
-                  variant="outlined"
-                  type="number"
-                  value={performanceValues[currentCompetence.competenceId] || ''}
-                  onChange={(e) => handlePerformanceChange(currentCompetence.competenceId, e.target.value)}
-                  fullWidth
-                  sx={{ mb: 3 }}
-                  InputProps={{
-                    endAdornment: <Typography>%</Typography>
-                  }}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, width: '100%', mt: 4 }}>
-            <IconButton onClick={handleBack} disabled={currentIndex === 0} sx={{ color: 'success.main' }}>
-              <KeyboardArrowLeft />
-            </IconButton>
-            <Typography variant="body2">
-              {currentIndex + 1} / {formTemplate?.competences?.length || 0}
-            </Typography>
-            <IconButton
-              onClick={handleNext}
-              disabled={currentIndex === (formTemplate?.competences?.length || 0) - 1}
-              sx={{ color: 'success.main' }}
-            >
-              <KeyboardArrowRight />
-            </IconButton>
-          </Box>
-        </MainCard>
-
-        {/* Section pour remplir les indicateurs métiers */}
-        <MainCard sx={{ mt: 3, p: 2, backgroundColor: '#E8EAF6' }}>
-          <Box>
-            <Typography variant="h5" sx={{ color: '#3949AB', mb: 4, textAlign: 'center' }}>
-              Indicateurs Métiers
-            </Typography>
-            <Box sx={{ display: 'grid', gap: 4 }}>
-              {formTemplate.indicators.map((indicator) => (
-                <Box key={indicator.indicatorId} sx={{ borderRadius: 2, border: '1px solid #E5E7EB' }}>
-                  <TextField
-                    label={indicator.label}
-                    variant="outlined"
-                    fullWidth
-                    multiline
-                    rows={4}
-                    value={indicatorValues[indicator.indicatorId]?.label || ''}
-                    onChange={(e) => handleIndicatorChange(indicator.indicatorId, 'label', 0, e.target.value)}
-                    sx={{ mb: 2 }}
-                  />
-
-                  {Array.from({ length: indicator.maxResults }).map((_, resultIndex) => (
-                    <Grid container spacing={2} key={resultIndex} sx={{ mb: 2 }}>
-                      <Grid item xs={8}>
-                        <TextField
-                          label={`Résultat Attendu ${resultIndex + 1}`}
-                          variant="outlined"
-                          fullWidth
-                          multiline
-                          rows={2}
-                          value={indicatorValues[indicator.indicatorId]?.results[resultIndex]?.result || ''}
-                          onChange={(e) => handleIndicatorChange(indicator.indicatorId, 'result', resultIndex, e.target.value)}
-                          disabled={isObjectiveSettingPeriod}
-                        />
-                      </Grid>
-                      <Grid item xs={4}>
-                        <TextField
-                          label="Pourcentage"
-                          variant="outlined"
-                          type="number"
-                          fullWidth
-                          value={indicatorValues[indicator.indicatorId]?.results[resultIndex]?.percentage || ''}
-                          onChange={(e) => handleIndicatorChange(indicator.indicatorId, 'percentage', resultIndex, e.target.value)}
-                          disabled={isObjectiveSettingPeriod}
-                          InputProps={{
-                            endAdornment: <Typography>%</Typography>
-                          }}
-                        />
-                      </Grid>
-                    </Grid>
-                  ))}
-                </Box>
-              ))}
+        {currentPeriod === 'Fixation Objectif' && (
+          <MainCard sx={{ mt: 3, p: 2, backgroundColor: '#E8EAF6' }}>
+            <Box>
+              <Typography variant="h5" sx={{ color: '#3949AB', mb: 4, textAlign: 'center' }}>
+                Indicateurs Métiers (Objectifs)
+              </Typography>
+              <Box sx={{ display: 'grid', gap: 4 }}>
+                {formTemplate.indicators.map((indicator) => {
+                  const indValue = indicatorValues[indicator.indicatorId] || {};
+                  return (
+                    <Box
+                      key={indicator.indicatorId}
+                      sx={{ borderRadius: 2, border: '1px solid #E5E7EB', p: 2 }}
+                    >
+                      <TextField
+                        label="Indicateur"
+                        variant="outlined"
+                        fullWidth
+                        multiline
+                        minRows={4}
+                        value={indValue.label || ''}
+                        onChange={(e) => handleIndicatorLabelChange(indicator.indicatorId, e.target.value)}
+                        sx={{ mb: 2 }}
+                      />
+                    </Box>
+                  );
+                })}
+              </Box>
             </Box>
-          </Box>
-        </MainCard>
+          </MainCard>
+        )}
+
+        {currentPeriod === 'Mi-Parcours' && (
+          <MainCard sx={{ mt: 3, p: 2, backgroundColor: '#F3E5F5' }}>
+            <Typography variant="h5" sx={{ color: '#3949AB', mb: 4, textAlign: 'center' }}>
+              Évaluation Mi-Parcours
+            </Typography>
+
+            {loading ? (
+              <Typography>Chargement des données...</Typography>
+            ) : dataError ? (
+              <Alert severity="error" sx={{ mb: 3 }}>
+                {dataError}
+              </Alert>
+            ) : (
+              <>
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="h6" sx={{ mb: 2 }}>
+                    Compétences
+                  </Typography>
+                  {competences.length > 0 ? (
+                    <Grid container spacing={2}>
+                      {competences.map((competence) => (
+                        <Grid item xs={12} sm={6} md={4} key={competence.UserCompetenceId}>
+                          <Paper sx={{ p: 2, border: '1px solid #E0E0E0' }}>
+                            <Typography variant="subtitle1">
+                              Compétence ID: {competence.competenceId}
+                            </Typography>
+                            <Typography variant="body1">
+                              Performance: {competence.performance}
+                            </Typography>
+                          </Paper>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  ) : (
+                    <Typography>Aucune compétence trouvée.</Typography>
+                  )}
+                </Box>
+
+                <Box>
+                  <Typography variant="h6" sx={{ mb: 2 }}>
+                    Indicateurs
+                  </Typography>
+                  {indicators.length > 0 ? (
+                    indicators.map((indicator) => (
+                      <Box key={indicator.indicatorId} sx={{ mb: 3 }}>
+                        <Typography variant="subtitle1">{indicator.indicatorName}</Typography>
+                        {indicator.results && indicator.results.length > 0 ? (
+                          <Grid container spacing={1}>
+                            {indicator.results.map((result, index) => (
+                              <Grid item xs={12} sm={6} key={index}>
+                                <Paper sx={{ p: 1, border: '1px solid #E0E0E0' }}>
+                                  <Typography variant="body2">
+                                    {result.resultText}: {result.result}
+                                  </Typography>
+                                </Paper>
+                              </Grid>
+                            ))}
+                          </Grid>
+                        ) : (
+                          <Typography variant="body2">Aucun résultat disponible.</Typography>
+                        )}
+                      </Box>
+                    ))
+                  ) : (
+                    <Typography>Aucun indicateur trouvé.</Typography>
+                  )}
+                </Box>
+              </>
+            )}
+
+            {/* Bouton pour archiver les données Mi-Parcours */}
+            <Button
+              variant="contained"
+              color="secondary"
+              sx={{ mt: 3 }}
+              onClick={handleArchiveMiParcours}
+              disabled={loading}
+            >
+              Archiver les Données Mi-Parcours
+            </Button>
+          </MainCard>
+        )}
+
+        {currentPeriod === 'Fixation Objectif' && (
+          <Button
+            variant="contained"
+            color="primary"
+            sx={{ mt: 3 }}
+            onClick={handleSubmitFixationObjectif}
+          >
+            Valider
+          </Button>
+        )}
       </MainCard>
     </Paper>
   );

@@ -86,8 +86,7 @@ namespace EvaluationService.Migrations
                     CompetenceId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     TemplateId = table.Column<int>(type: "int", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
-                    Weight = table.Column<decimal>(type: "decimal(18,2)", nullable: false)
+                    Name = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -112,7 +111,10 @@ namespace EvaluationService.Migrations
                     Final = table.Column<DateTime>(type: "datetime2", nullable: false),
                     EtatId = table.Column<int>(type: "int", nullable: false),
                     TemplateId = table.Column<int>(type: "int", nullable: false),
-                    Titre = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                    Titre = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Type = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CompetenceWeightTotal = table.Column<decimal>(type: "decimal(18,2)", nullable: true),
+                    IndicatorWeightTotal = table.Column<decimal>(type: "decimal(18,2)", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -160,13 +162,35 @@ namespace EvaluationService.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     Name = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
                     MaxObjectives = table.Column<int>(type: "int", nullable: false),
-                    TemplateId = table.Column<int>(type: "int", nullable: false)
+                    TemplateId = table.Column<int>(type: "int", nullable: false),
+                    IsActif = table.Column<bool>(type: "bit", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_TemplateStrategicPriorities", x => x.TemplatePriorityId);
                     table.ForeignKey(
                         name: "FK_TemplateStrategicPriorities_FormTemplates_TemplateId",
+                        column: x => x.TemplateId,
+                        principalTable: "FormTemplates",
+                        principalColumn: "TemplateId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UserEvaluationWeights",
+                columns: table => new
+                {
+                    WeightId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    TemplateId = table.Column<int>(type: "int", nullable: false),
+                    CompetenceWeightTotal = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    IndicatorWeightTotal = table.Column<decimal>(type: "decimal(18,2)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserEvaluationWeights", x => x.WeightId);
+                    table.ForeignKey(
+                        name: "FK_UserEvaluationWeights_FormTemplates_TemplateId",
                         column: x => x.TemplateId,
                         principalTable: "FormTemplates",
                         principalColumn: "TemplateId",
@@ -181,8 +205,7 @@ namespace EvaluationService.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     CompetenceId = table.Column<int>(type: "int", nullable: false),
                     LevelId = table.Column<int>(type: "int", nullable: false),
-                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Score = table.Column<decimal>(type: "decimal(18,2)", nullable: true)
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -231,6 +254,7 @@ namespace EvaluationService.Migrations
                     PriorityName = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
                     Description = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
                     Weighting = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    ValidatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
@@ -263,6 +287,119 @@ namespace EvaluationService.Migrations
                     table.PrimaryKey("PK_HistoryCMps", x => x.HcmId);
                     table.ForeignKey(
                         name: "FK_HistoryCMps_UserEvaluations_UserEvalId",
+                        column: x => x.UserEvalId,
+                        principalTable: "UserEvaluations",
+                        principalColumn: "UserEvalId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "HistoryUserCompetenceFOs",
+                columns: table => new
+                {
+                    HistoryUserCompetenceId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    UserEvalId = table.Column<int>(type: "int", nullable: false),
+                    CompetenceName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Performance = table.Column<decimal>(type: "decimal(18,2)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_HistoryUserCompetenceFOs", x => x.HistoryUserCompetenceId);
+                    table.ForeignKey(
+                        name: "FK_HistoryUserCompetenceFOs_UserEvaluations_UserEvalId",
+                        column: x => x.UserEvalId,
+                        principalTable: "UserEvaluations",
+                        principalColumn: "UserEvalId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "HistoryUserCompetenceMPs",
+                columns: table => new
+                {
+                    HistoryUserCompetenceId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    UserEvalId = table.Column<int>(type: "int", nullable: false),
+                    CompetenceName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Performance = table.Column<decimal>(type: "decimal(18,2)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_HistoryUserCompetenceMPs", x => x.HistoryUserCompetenceId);
+                    table.ForeignKey(
+                        name: "FK_HistoryUserCompetenceMPs_UserEvaluations_UserEvalId",
+                        column: x => x.UserEvalId,
+                        principalTable: "UserEvaluations",
+                        principalColumn: "UserEvalId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "HistoryUserIndicatorFOs",
+                columns: table => new
+                {
+                    HistoryUserIndicatorFOId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    UserEvalId = table.Column<int>(type: "int", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
+                    ResultText = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Result = table.Column<decimal>(type: "decimal(18,2)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_HistoryUserIndicatorFOs", x => x.HistoryUserIndicatorFOId);
+                    table.ForeignKey(
+                        name: "FK_HistoryUserIndicatorFOs_UserEvaluations_UserEvalId",
+                        column: x => x.UserEvalId,
+                        principalTable: "UserEvaluations",
+                        principalColumn: "UserEvalId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "HistoryUserIndicatorMPs",
+                columns: table => new
+                {
+                    HistoryUserIndicatorMPId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    UserEvalId = table.Column<int>(type: "int", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
+                    ResultText = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Result = table.Column<decimal>(type: "decimal(18,2)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_HistoryUserIndicatorMPs", x => x.HistoryUserIndicatorMPId);
+                    table.ForeignKey(
+                        name: "FK_HistoryUserIndicatorMPs_UserEvaluations_UserEvalId",
+                        column: x => x.UserEvalId,
+                        principalTable: "UserEvaluations",
+                        principalColumn: "UserEvalId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UserCompetences",
+                columns: table => new
+                {
+                    UserCompetenceId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    UserEvalId = table.Column<int>(type: "int", nullable: false),
+                    CompetenceId = table.Column<int>(type: "int", nullable: false),
+                    Performance = table.Column<decimal>(type: "decimal(18,2)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserCompetences", x => x.UserCompetenceId);
+                    table.ForeignKey(
+                        name: "FK_UserCompetences_Competences_CompetenceId",
+                        column: x => x.CompetenceId,
+                        principalTable: "Competences",
+                        principalColumn: "CompetenceId",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_UserCompetences_UserEvaluations_UserEvalId",
                         column: x => x.UserEvalId,
                         principalTable: "UserEvaluations",
                         principalColumn: "UserEvalId",
@@ -305,7 +442,6 @@ namespace EvaluationService.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     UserEvalId = table.Column<int>(type: "int", nullable: false),
                     Name = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
-                    AttainmentPercentage = table.Column<decimal>(type: "decimal(18,2)", nullable: true),
                     IndicatorId = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
@@ -333,10 +469,12 @@ namespace EvaluationService.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     Description = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
                     Weighting = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    ResultIndicator = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ResultIndicator = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     Result = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
                     UserEvalId = table.Column<int>(type: "int", nullable: false),
-                    PriorityId = table.Column<int>(type: "int", nullable: false)
+                    PriorityId = table.Column<int>(type: "int", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -406,8 +544,8 @@ namespace EvaluationService.Migrations
                     ResultId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     UserIndicatorId = table.Column<int>(type: "int", nullable: false),
-                    LineNumber = table.Column<int>(type: "int", nullable: false),
-                    ResultText = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                    ResultText = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Result = table.Column<decimal>(type: "decimal(18,2)", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -493,6 +631,26 @@ namespace EvaluationService.Migrations
                 column: "HcmId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_HistoryUserCompetenceFOs_UserEvalId",
+                table: "HistoryUserCompetenceFOs",
+                column: "UserEvalId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_HistoryUserCompetenceMPs_UserEvalId",
+                table: "HistoryUserCompetenceMPs",
+                column: "UserEvalId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_HistoryUserIndicatorFOs_UserEvalId",
+                table: "HistoryUserIndicatorFOs",
+                column: "UserEvalId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_HistoryUserIndicatorMPs_UserEvalId",
+                table: "HistoryUserIndicatorMPs",
+                column: "UserEvalId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Indicators_TemplateId",
                 table: "Indicators",
                 column: "TemplateId");
@@ -513,9 +671,24 @@ namespace EvaluationService.Migrations
                 column: "TemplateId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_UserCompetences_CompetenceId",
+                table: "UserCompetences",
+                column: "CompetenceId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserCompetences_UserEvalId",
+                table: "UserCompetences",
+                column: "UserEvalId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_UserEvaluations_EvalId",
                 table: "UserEvaluations",
                 column: "EvalId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserEvaluationWeights_TemplateId",
+                table: "UserEvaluationWeights",
+                column: "TemplateId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_UserHelpContents_HelpId",
@@ -566,16 +739,31 @@ namespace EvaluationService.Migrations
                 name: "HistoryObjectiveColumnValuesMps");
 
             migrationBuilder.DropTable(
+                name: "HistoryUserCompetenceFOs");
+
+            migrationBuilder.DropTable(
+                name: "HistoryUserCompetenceMPs");
+
+            migrationBuilder.DropTable(
+                name: "HistoryUserIndicatorFOs");
+
+            migrationBuilder.DropTable(
+                name: "HistoryUserIndicatorMPs");
+
+            migrationBuilder.DropTable(
                 name: "ObjectiveColumnValues");
+
+            migrationBuilder.DropTable(
+                name: "UserCompetences");
+
+            migrationBuilder.DropTable(
+                name: "UserEvaluationWeights");
 
             migrationBuilder.DropTable(
                 name: "UserHelpContents");
 
             migrationBuilder.DropTable(
                 name: "UserIndicatorResults");
-
-            migrationBuilder.DropTable(
-                name: "Competences");
 
             migrationBuilder.DropTable(
                 name: "Levels");
@@ -591,6 +779,9 @@ namespace EvaluationService.Migrations
 
             migrationBuilder.DropTable(
                 name: "UserObjectives");
+
+            migrationBuilder.DropTable(
+                name: "Competences");
 
             migrationBuilder.DropTable(
                 name: "Helps");

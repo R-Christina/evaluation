@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import MainCard from 'ui-component/cards/MainCard';
 import { Grid, Typography, Paper, Box, TextField, IconButton, Alert, Button } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -6,17 +6,55 @@ import { formulaireInstance } from '../../../../axiosConfig';
 import { KeyboardArrowLeft, KeyboardArrowRight } from '@mui/icons-material';
 
 const Remplissage = () => {
-  const [userType] = useState(JSON.parse(localStorage.getItem('user'))?.typeUser || null);
+  const user = JSON.parse(localStorage.getItem('user'));
+  const userType = user.typeUser;
+  const userId = user.id;
+
   const [templateId, setTemplateId] = useState(null);
   const [template, setTemplate] = useState(null);
-  const [objectiveIndices, setObjectiveIndices] = useState([]);
+  const [userObjectives, setUserObjectives] = useState([]);
+  const [groupedObjectives, setGroupedObjectives] = useState({});
+  const [objectiveIndices, setObjectiveIndices] = useState({});
   const [hasOngoingEvaluation, setHasOngoingEvaluation] = useState(false);
   const [currentPeriod, setCurrentPeriod] = useState('');
   const [isValidated, setIsValidated] = useState(false);
   const [evalId, setEvalId] = useState(null);
-  const [fixationObjectives, setFixationObjectives] = useState([]);
-  const [missingResultsWarning, setMissingResultsWarning] = useState(false);
+  const [error, setError] = useState(null);
 
+  // Référence pour éviter la mise à jour multiple du template
+  const isTemplateUpdated = useRef(false);
+
+  // Fonction fetchUserObjectives intégrée
+  const fetchUserObjectives = async (evalId, userId) => {
+    try {
+      const response = await formulaireInstance.get(`/Evaluation/userObjectif`, {
+        params: { evalId, userId }
+      });
+      setUserObjectives(response.data);
+
+      // Regrouper les objectifs par `templateStrategicPriority.name`
+      const grouped = response.data.reduce((acc, obj) => {
+        const groupName = obj.templateStrategicPriority?.name || 'Non définie';
+        if (!acc[groupName]) {
+          acc[groupName] = [];
+        }
+        acc[groupName].push(obj);
+        return acc;
+      }, {});
+      setGroupedObjectives(grouped);
+
+      // Initialiser les indices de navigation
+      const indices = Object.keys(grouped).reduce((acc, groupName) => {
+        acc[groupName] = 0;
+        return acc;
+      }, {});
+      setObjectiveIndices(indices);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Erreur lors de la récupération des objectifs utilisateur.');
+    }
+  };
+
+  // Effet pour récupérer l'ID du template si l'utilisateur est un Cadre
   useEffect(() => {
     if (userType === 'Cadre') {
       const fetchCadreTemplateId = async () => {
@@ -35,6 +73,7 @@ const Remplissage = () => {
     }
   }, [userType]);
 
+  // Effet pour vérifier s'il y a une évaluation en cours
   useEffect(() => {
     if (userType === 'Cadre') {
       const checkOngoingEvaluation = async () => {
@@ -55,13 +94,13 @@ const Remplissage = () => {
     }
   }, [userType]);
 
+  // Effet pour récupérer le template et la période actuelle
   useEffect(() => {
     if (hasOngoingEvaluation && templateId && userType === 'Cadre') {
       const fetchData = async () => {
         try {
           const templateResponse = await formulaireInstance.get(`/Template/${templateId}`);
           const fetchedTemplate = templateResponse.data.template;
-          setObjectiveIndices(Array(fetchedTemplate.templateStrategicPriorities.length).fill(0));
           setTemplate(fetchedTemplate);
 
           const periodResponse = await formulaireInstance.get('/Periode/periodeActel', { params: { type: 'Cadre' } });
@@ -76,364 +115,431 @@ const Remplissage = () => {
     }
   }, [templateId, hasOngoingEvaluation, userType]);
 
+  // Effet pour appeler fetchUserObjectives lorsque evalId et userId sont disponibles
   useEffect(() => {
-    const fetchFixationObjectives = async () => {
-      try {
-        const userId = JSON.parse(localStorage.getItem('user'))?.id;
-        const response = await formulaireInstance.get(`/Evaluation/userObjectif`, {
-          params: { evalId, userId }
-        });
-
-        if (response.data) {
-          setFixationObjectives(response.data);
-        } else {
-          console.error('No objectives found for fixation phase');
+    if (hasOngoingEvaluation && evalId && userId) {
+      // fetchUserObjectives est uniquement nécessaire pour 'Mi-Parcours'
+      const fetchPeriodAndObjectives = async () => {
+        try {
+          const periodResponse = await formulaireInstance.get('/Periode/periodeActel', { params: { type: 'Cadre' } });
+          if (periodResponse.data?.length > 0) {
+            const period = periodResponse.data[0].currentPeriod;
+            setCurrentPeriod(period);
+            if (period === 'Mi-Parcours') {
+              await fetchUserObjectives(evalId, userId);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching period data:', error);
         }
-      } catch (error) {
-        console.error('Error fetching fixation objectives:', error);
-      }
-    };
-
-    if (hasOngoingEvaluation && currentPeriod === 'Mi-Parcours') {
-      fetchFixationObjectives();
-    }
-  }, [evalId, hasOngoingEvaluation, currentPeriod]);
-
-  const handleObjectiveChange = (priorityIndex, objectiveIndex, field, value) => {
-    setTemplate((prevTemplate) => {
-      const updatedTemplate = { ...prevTemplate };
-      updatedTemplate.templateStrategicPriorities[priorityIndex].objectives[objectiveIndex] = {
-        ...updatedTemplate.templateStrategicPriorities[priorityIndex].objectives[objectiveIndex],
-        [field]: value
       };
-      return updatedTemplate;
-    });
+      fetchPeriodAndObjectives();
+    }
+  }, [hasOngoingEvaluation, evalId, userId]);
+
+  const handleObjectiveChange = (groupName, objectiveIndex, field, value) => {
+    if (currentPeriod === 'Fixation Objectif') {
+      setTemplate((prevTemplate) => {
+        const updatedTemplate = { ...prevTemplate };
+        const priorityIndex = updatedTemplate.templateStrategicPriorities.findIndex(
+          (priority) => priority.name === groupName
+        );
+        if (priorityIndex !== -1) {
+          updatedTemplate.templateStrategicPriorities[priorityIndex].objectives[objectiveIndex][field] = value;
+        }
+        return updatedTemplate;
+      });
+    } else if (currentPeriod === 'Mi-Parcours') {
+      setGroupedObjectives((prevGrouped) => {
+        const updatedGroup = [...prevGrouped[groupName]];
+        updatedGroup[objectiveIndex] = {
+          ...updatedGroup[objectiveIndex],
+          [field]: value
+        };
+        return {
+          ...prevGrouped,
+          [groupName]: updatedGroup
+        };
+      });
+    }
   };
 
+ // Fonction pour valider les objectifs
   const handleValidateObjectives = async () => {
     setIsValidated(true);
-    const userId = JSON.parse(localStorage.getItem('user'))?.id;
-    const type = userType;
 
-    const objectivesData = template.templateStrategicPriorities.flatMap((priority) =>
-      priority.objectives.map((objective) => ({
-        priorityId: priority.templatePriorityId,
-        priorityName: priority.name,
-        description: objective.description || 'N/A',
-        weighting: parseFloat(objective.weighting) || 0,
-        resultIndicator: objective.resultIndicator || 'N/A',
-        result: objective.result || 0,
-        dynamicColumns: objective.dynamicColumns
-          ? objective.dynamicColumns.map((col) => ({
-              columnName: col.columnName || '',
-              value: col.value || ''
-            }))
-          : []
-      }))
-    );
+    let objectivesData = [];
 
-    // Check for missing results
-    const missingResults = objectivesData.some((obj) => obj.description !== 'N/A' && obj.result === 0);
-    if (missingResults) {
-      setMissingResultsWarning(true);
+    if (currentPeriod === 'Fixation Objectif') {
+      if (!template) {
+        console.error('No template data to validate.');
+        return;
+      }
+
+      objectivesData = template.templateStrategicPriorities.flatMap((priority) =>
+        priority.objectives.map((objective) => ({
+          priorityId: priority.templatePriorityId, // Provenant du template
+          priorityName: priority.name,
+          description: objective.description || '',
+          weighting: parseFloat(objective.weighting) || 0,
+          resultIndicator: objective.resultIndicator || '',
+          result: parseFloat(objective.result) || 0,
+          dynamicColumns: objective.dynamicColumns
+            ? objective.dynamicColumns.map((col) => ({
+                columnName: col.columnName || '',
+                value: col.value === 'N/A' ? '' : col.value,
+              }))
+            : [],
+        }))
+      );
+    } else if (currentPeriod === 'Mi-Parcours') {
+      if (!groupedObjectives) {
+        console.error('No objectives data to validate.');
+        return;
+      }
+
+      objectivesData = Object.entries(groupedObjectives).flatMap(([groupName, objectives]) =>
+        objectives.map((objective) => ({
+          priorityId: objective.templateStrategicPriority.templatePriorityId, // Provenant des userObjectives
+          priorityName: groupName,
+          description: objective.description || '',
+          weighting: parseFloat(objective.weighting) || 0,
+          resultIndicator: objective.resultIndicator || '',
+          result: parseFloat(objective.result) || 0,
+          dynamicColumns: objective.objectiveColumnValues
+            ? objective.objectiveColumnValues.map((colVal) => ({
+                columnName: colVal.objectiveColumn?.name || '',
+                value: colVal.value || 'N/A'
+              }))
+            : [],
+        }))
+      );
+    } else {
+      console.error('Période non reconnue:', currentPeriod);
+      alert('Période non valide. Veuillez vérifier les données.');
       return;
     }
 
-    console.log("Data being sent to the backend:", objectivesData); // Log data for debugging
+    console.log('Data being sent to the backend:', objectivesData);
 
-    const endpoint = currentPeriod === 'Mi-Parcours'
-      ? `/Evaluation/updateMidtermObjectivesCadre`
-      : `/Evaluation/validateObjectivesCadre`;
+    let url = '';
+
+    if (currentPeriod === 'Fixation Objectif') {
+      url = '/Evaluation/validateUserObjectives';
+    } else if (currentPeriod === 'Mi-Parcours') {
+      url = '/Evaluation/validateMitermObjectifHistory';
+    }
 
     try {
-      await formulaireInstance.post(endpoint, objectivesData, {
-        headers: { 'Content-Type': 'application/json' },
-        params: { userId, type }
-      });
+      await formulaireInstance.post(
+        url,
+        objectivesData,
+        {
+          headers: { 'Content-Type': 'application/json' },
+          params: { userId, type: userType },
+        }
+      );
+
       alert('Objectifs validés et enregistrés avec succès.');
-    } catch (error) {
-      console.error('Erreur lors de la validation des objectifs:', error);
-      alert('Erreur de validation. Veuillez vérifier les données envoyées.');
+    } catch (err) {
+      console.error('Erreur backend complète:', err);
+
+      const message = err.response?.data?.message || err.message || 'Erreur inconnue.';
+      setError(message);
     }
   };
 
+  // Vérifier le type d'utilisateur
   if (userType !== 'Cadre') {
     return (
       <Box display="flex" justifyContent="center" p={20}>
         <Alert severity="error">
-          <Typography variant="h5">Access Denied</Typography>
-          <Typography variant="body1">Only Cadre users can access this page.</Typography>
+          <Typography variant="h5">Accès Refusé</Typography>
+          <Typography variant="body1">Seuls les utilisateurs Cadre peuvent accéder à cette page.</Typography>
         </Alert>
       </Box>
     );
   }
 
+  // Vérifier s'il y a une évaluation en cours
   if (!hasOngoingEvaluation) {
     return (
       <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" textAlign="center" p={20}>
         <Alert severity="info" sx={{ mb: 2 }}>
           <Typography variant="h4">Aucune évaluation en cours</Typography>
-          <Typography variant="body1">Vous allez recevoir une notification lors du commencement</Typography>
+          <Typography variant="body1">Vous recevrez une notification lors du commencement.</Typography>
         </Alert>
         <Button variant="contained" color="primary" onClick={() => (window.location.href = '/')}>
-          Go Back to Home
+          Retour à l'accueil
         </Button>
       </Box>
     );
   }
 
-  if (!template) {
-    return <Typography>Loading...</Typography>;
+  // Vérifier si le template est chargé en 'Fixation Objectif' ou si les userObjectives sont chargés en 'Mi-Parcours'
+  if ((currentPeriod === 'Fixation Objectif' && !template) || (currentPeriod === 'Mi-Parcours' && !userObjectives.length)) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
+        <Typography variant="h6">Chargement...</Typography>
+      </Box>
+    );
   }
 
-  const isObjectiveSettingPeriod = currentPeriod === 'Fixation Objectif';
+  // Fonction de rendu des objectifs en fonction de la période
+  const renderObjectives = () => {
+    if (currentPeriod === 'Fixation Objectif') {
+      return template.templateStrategicPriorities.map((priority, priorityIndex) => {
+        const currentObjectiveIndex = objectiveIndices[priority.name] || 0;
+        const currentObjective = priority.objectives[currentObjectiveIndex];
+
+        return (
+          <MainCard key={priority.templatePriorityId} sx={{ mt: 3, p: 2, backgroundColor: '#E8EAF6' }}>
+            <Typography variant="h5" sx={{ mb: 3 }} gutterBottom>
+              {priority.name}
+            </Typography>
+
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={`${priorityIndex}-${currentObjectiveIndex}`}
+                initial={{ opacity: 0, x: 50 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -50 }}
+                transition={{ duration: 0.5 }}
+                style={{ marginBottom: '1rem' }}
+              >
+                <Box>
+                  <TextField
+                    label="Objectif"
+                    fullWidth
+                    variant="outlined"
+                    multiline
+                    minRows={4}
+                    value={currentObjective.description || ''}
+                    onChange={(e) =>
+                      handleObjectiveChange(priority.name, currentObjectiveIndex, 'description', e.target.value)
+                    }
+                    sx={{ mb: 2, mt: 1 }}
+                  />
+
+                  <TextField
+                    label="Pondération"
+                    fullWidth
+                    variant="outlined"
+                    type="text"
+                    value={currentObjective.weighting || ''}
+                    onChange={(e) => {
+                      let value = e.target.value;
+                      if (!/^\d{0,3}([.,]\d{0,2})?$/.test(value)) return;
+                      value = value.replace(',', '.');
+                      handleObjectiveChange(priority.name, currentObjectiveIndex, 'weighting', value);
+                    }}
+                    sx={{ mb: 2, mt: 1 }}
+                    inputProps={{ maxLength: 6 }}
+                  />
+
+                  <Box display="flex" justifyContent="right" alignItems="center" mt={2}>
+                    <IconButton
+                      onClick={() => {
+                        setObjectiveIndices((prevIndices) => ({
+                          ...prevIndices,
+                          [priority.name]: Math.max(currentObjectiveIndex - 1, 0)
+                        }));
+                      }}
+                      disabled={currentObjectiveIndex === 0}
+                      sx={{ color: 'success.main' }}
+                    >
+                      <KeyboardArrowLeft />
+                    </IconButton>
+                    <Typography variant="body1" sx={{ mx: 2 }}>
+                      {currentObjectiveIndex + 1} / {priority.objectives.length}
+                    </Typography>
+                    <IconButton
+                      onClick={() => {
+                        setObjectiveIndices((prevIndices) => ({
+                          ...prevIndices,
+                          [priority.name]: Math.min(currentObjectiveIndex + 1, priority.objectives.length - 1)
+                        }));
+                      }}
+                      disabled={currentObjectiveIndex === priority.objectives.length - 1}
+                      sx={{ color: 'success.main' }}
+                    >
+                      <KeyboardArrowRight />
+                    </IconButton>
+                  </Box>
+                </Box>
+              </motion.div>
+            </AnimatePresence>
+          </MainCard>
+        );
+      });
+    } else if (currentPeriod === 'Mi-Parcours') {
+      return Object.keys(groupedObjectives).map((groupName, groupIndex) => {
+        const currentObjectiveIndex = objectiveIndices[groupName] || 0;
+        const currentObjective = groupedObjectives[groupName][currentObjectiveIndex];
+
+        return (
+          <MainCard key={groupIndex} sx={{ mt: 3, p: 2, backgroundColor: '#E8EAF6' }}>
+            <Typography variant="h5" sx={{ mb: 3 }} gutterBottom>
+              {groupName}
+            </Typography>
+
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={`${groupName}-${currentObjectiveIndex}`}
+                initial={{ opacity: 0, x: 50 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -50 }}
+                transition={{ duration: 0.5 }}
+                style={{ marginBottom: '1rem' }}
+              >
+                <Box>
+                  <TextField
+                    label="Objectif"
+                    fullWidth
+                    variant="outlined"
+                    multiline
+                    minRows={4}
+                    value={currentObjective.description || ''}
+                    InputProps={{ readOnly: true }}
+                    onChange={(e) =>
+                      handleObjectiveChange(groupName, currentObjectiveIndex, 'description', e.target.value)
+                    }
+                    sx={{ mb: 2, mt: 1 }}
+                  />
+
+                  <TextField
+                    label="Pondération"
+                    fullWidth
+                    variant="outlined"
+                    type="text"
+                    value={currentObjective.weighting || ''}
+                    InputProps={{ readOnly: true }}
+                    onChange={(e) => {
+                      let value = e.target.value;
+                      if (!/^\d{0,3}([.,]\d{0,2})?$/.test(value)) return;
+                      value = value.replace(',', '.');
+                      handleObjectiveChange(groupName, currentObjectiveIndex, 'weighting', value);
+                    }}
+                    sx={{ mb: 2, mt: 1 }}
+                    inputProps={{ maxLength: 6 }}
+                  />
+
+                  <TextField
+                    label="Indicateur de résultat"
+                    fullWidth
+                    variant="outlined"
+                    multiline
+                    minRows={4}
+                    value={currentObjective.resultIndicator || ''}
+                    InputProps={{ readOnly: true }}
+                    onChange={(e) =>
+                      handleObjectiveChange(groupName, currentObjectiveIndex, 'resultIndicator', e.target.value)
+                    }
+                    sx={{ mb: 2, mt: 1 }}
+                  />
+
+                  <TextField
+                    label="Résultat"
+                    fullWidth
+                    variant="outlined"
+                    type="text"
+                    value={currentObjective.result || ''}
+                    InputProps={{ readOnly: true }}
+                    onChange={(e) => {
+                      let value = e.target.value;
+                      if (!/^\d{0,3}([.,]\d{0,2})?$/.test(value)) return;
+                      value = value.replace(',', '.');
+                      handleObjectiveChange(groupName, currentObjectiveIndex, 'result', value);
+                    }}
+                    sx={{ mb: 2, mt: 1 }}
+                    inputProps={{ maxLength: 6 }}
+                  />
+
+                  {/* Affichage des objectiveColumnValues */}
+                  {currentObjective.objectiveColumnValues && currentObjective.objectiveColumnValues.length > 0 && (
+                    <>
+                      <Typography variant="subtitle1" sx={{ mb: 1, mt: 2 }}>
+                        {currentObjective.objectiveColumnValues.map((colVal) => colVal.objectiveColumn?.name).join(', ')}
+                      </Typography>
+                      {currentObjective.objectiveColumnValues.map((colVal) => (
+                        <TextField
+                          key={colVal.valueId}
+                          fullWidth
+                          variant="outlined"
+                          multiline
+                          minRows={2}
+                          value={colVal.value === 'N/A' ? '' : colVal.value}
+                          InputProps={{ readOnly: true }} // Champ en lecture seule
+                          sx={{ mb: 2, mt: 1 }}
+                        />
+                      ))}
+                    </>
+                  )}
+
+                  <Box display="flex" justifyContent="right" alignItems="center" mt={2}>
+                    <IconButton
+                      onClick={() => {
+                        setObjectiveIndices((prevIndices) => ({
+                          ...prevIndices,
+                          [groupName]: Math.max(currentObjectiveIndex - 1, 0)
+                        }));
+                      }}
+                      disabled={currentObjectiveIndex === 0}
+                      sx={{ color: 'success.main' }}
+                    >
+                      <KeyboardArrowLeft />
+                    </IconButton>
+                    <Typography variant="body1" sx={{ mx: 2 }}>
+                      {currentObjectiveIndex + 1} / {groupedObjectives[groupName].length}
+                    </Typography>
+                    <IconButton
+                      onClick={() => {
+                        setObjectiveIndices((prevIndices) => ({
+                          ...prevIndices,
+                          [groupName]: Math.min(currentObjectiveIndex + 1, groupedObjectives[groupName].length - 1)
+                        }));
+                      }}
+                      disabled={currentObjectiveIndex === groupedObjectives[groupName].length - 1}
+                      sx={{ color: 'success.main' }}
+                    >
+                      <KeyboardArrowRight />
+                    </IconButton>
+                  </Box>
+                </Box>
+              </motion.div>
+            </AnimatePresence>
+          </MainCard>
+        );
+      });
+    } else {
+      return null;
+    }
+  };
 
   return (
     <Paper>
       <MainCard>
         <Grid container alignItems="center" justifyContent="space-between">
           <Grid item>
-            <Typography variant="subtitle2">Evaluation</Typography>
+            <Typography variant="subtitle2">Évaluation</Typography>
             <Typography variant="h3">
               Période : <span style={{ color: '#3949AB' }}>{currentPeriod}</span>
             </Typography>
           </Grid>
         </Grid>
 
-        {missingResultsWarning && (
-          <Alert severity="warning" sx={{ mt: 2 }}>
-            Certains objectifs ont été définis sans résultats correspondants. Veuillez vérifier et compléter les résultats avant de valider.
+        {error && ( // Affichage de l'erreur s'il y en a une
+          <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
+            {error}
           </Alert>
         )}
 
-        {template.templateStrategicPriorities.map((priority, priorityIndex) => {
-          const currentObjectiveIndex = objectiveIndices[priorityIndex];
-          const currentObjective = priority.objectives[currentObjectiveIndex];
-
-          const matchingObjectives = fixationObjectives.filter((obj) => obj.templateStrategicPriority.name === priority.name);
-          const matchingObjective = matchingObjectives[currentObjectiveIndex];
-
-          return (
-            <MainCard key={priority.templatePriorityId} sx={{ mt: 3, p: 2, backgroundColor: '#E8EAF6' }}>
-              <Typography variant="h5" sx={{ mb: 3 }} gutterBottom>
-                {priority.name}
-              </Typography>
-
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={currentObjectiveIndex}
-                  initial={{ opacity: 0, x: 50 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -50 }}
-                  transition={{ duration: 0.5 }}
-                  style={{ marginBottom: '1rem' }}
-                >
-                  <Box>
-                    {matchingObjective ? (
-                      <>
-                        <Box mb={0} p={1.5} sx={{ backgroundColor: '#fffaf1', borderRadius: 1, borderLeft: '4px solid #FB8C00' }}>
-                          <Typography variant="subtitle2" color="textSecondary" sx={{ fontWeight: 'bold' }}>
-                            Objectif fixé :
-                          </Typography>
-                          <Typography variant="body2" color="textPrimary">
-                            {matchingObjective.description}
-                          </Typography>
-                        </Box>
-                        <TextField
-                          label="Objectif"
-                          fullWidth
-                          variant="outlined"
-                          multiline
-                          minRows={4}
-                          value={currentObjective.description || ''}
-                          onChange={(e) => handleObjectiveChange(priorityIndex, currentObjectiveIndex, 'description', e.target.value)}
-                          sx={{ mb: 2, mt: 1 }}
-                        />
-
-                        <Box mb={0} p={1.5} sx={{ backgroundColor: '#fffaf1', borderRadius: 1, borderLeft: '4px solid #FB8C00' }}>
-                          <Typography variant="subtitle2" color="textSecondary" sx={{ fontWeight: 'bold' }}>
-                            Pondération fixé :
-                          </Typography>
-                          <Typography variant="body2" color="textPrimary">
-                            {matchingObjective.weighting}
-                          </Typography>
-                        </Box>
-                        <TextField
-                          label="Pondération"
-                          fullWidth
-                          variant="outlined"
-                          type="text"
-                          value={currentObjective.weighting || ''}
-                          onChange={(e) => {
-                            let value = e.target.value;
-                            if (!/^\d{0,3}([.,]\d{0,2})?$/.test(value)) return;
-                            value = value.replace(',', '.');
-                            handleObjectiveChange(priorityIndex, currentObjectiveIndex, 'weighting', value);
-                          }}
-                          sx={{ mb: 2, mt: 1 }}
-                          inputProps={{ maxLength: 6 }}
-                        />
-
-                        <TextField
-                          label="Indicateur de Résultat"
-                          fullWidth
-                          variant="outlined"
-                          multiline
-                          minRows={4}
-                          value={currentObjective.resultIndicator || ''}
-                          onChange={(e) => handleObjectiveChange(priorityIndex, currentObjectiveIndex, 'resultIndicator', e.target.value)}
-                          sx={{ mb: 2, mt: 1 }}
-                        />
-
-                        <TextField
-                          label="Résultat"
-                          fullWidth
-                          variant="outlined"
-                          type="text"
-                          value={currentObjective.result || ''}
-                          onChange={(e) => {
-                            let value = e.target.value;
-                            if (!/^\d{0,3}([.,]\d{0,2})?$/.test(value)) return;
-                            value = value.replace(',', '.');
-                            handleObjectiveChange(priorityIndex, currentObjectiveIndex, 'result', value);
-                          }}
-                          sx={{ mb: 2, mt: 1 }}
-                          inputProps={{ maxLength: 6 }}
-                        />
-
-                        <Box display="flex" justifyContent="right" alignItems="center" mt={2}>
-                          <IconButton
-                            onClick={() => {
-                              setObjectiveIndices((prevIndices) => {
-                                const newIndices = [...prevIndices];
-                                newIndices[priorityIndex] = Math.max(currentObjectiveIndex - 1, 0);
-                                return newIndices;
-                              });
-                            }}
-                            disabled={currentObjectiveIndex === 0}
-                            sx={{ color: 'success.main' }}
-                          >
-                            <KeyboardArrowLeft />
-                          </IconButton>
-                          <Typography variant="body1" sx={{ mx: 2 }}>
-                            {currentObjectiveIndex + 1} / {priority.objectives.length}
-                          </Typography>
-                          <IconButton
-                            onClick={() => {
-                              setObjectiveIndices((prevIndices) => {
-                                const newIndices = [...prevIndices];
-                                newIndices[priorityIndex] = Math.min(currentObjectiveIndex + 1, priority.objectives.length - 1);
-                                return newIndices;
-                              });
-                            }}
-                            disabled={currentObjectiveIndex === priority.objectives.length - 1}
-                            sx={{ color: 'success.main' }}
-                          >
-                            <KeyboardArrowRight />
-                          </IconButton>
-                        </Box>
-                      </>
-                    ) : (
-                      <>
-                        <TextField
-                          label="Objectif"
-                          fullWidth
-                          variant="outlined"
-                          multiline
-                          minRows={4}
-                          value={currentObjective.description || ''}
-                          onChange={(e) => handleObjectiveChange(priorityIndex, currentObjectiveIndex, 'description', e.target.value)}
-                          sx={{ mb: 2, mt: 1 }}
-                        />
-                        <TextField
-                          label="Pondération"
-                          fullWidth
-                          variant="outlined"
-                          type="text"
-                          value={currentObjective.weighting || ''}
-                          onChange={(e) => {
-                            let value = e.target.value;
-                            if (!/^\d{0,3}([.,]\d{0,2})?$/.test(value)) return;
-                            value = value.replace(',', '.');
-                            handleObjectiveChange(priorityIndex, currentObjectiveIndex, 'weighting', value);
-                          }}
-                          sx={{ mb: 2, mt: 1 }}
-                          inputProps={{ maxLength: 6 }}
-                        />
-
-                        <TextField
-                          label="Indicateur de Résultat"
-                          fullWidth
-                          variant="outlined"
-                          multiline
-                          minRows={4}
-                          value={currentObjective.resultIndicator || ''}
-                          onChange={(e) => handleObjectiveChange(priorityIndex, currentObjectiveIndex, 'resultIndicator', e.target.value)}
-                          sx={{ mb: 2, mt: 1 }}
-                          disabled={isObjectiveSettingPeriod}
-                        />
-
-                        <TextField
-                          label="Résultat"
-                          fullWidth
-                          variant="outlined"
-                          type="text"
-                          value={currentObjective.result || ''}
-                          onChange={(e) => {
-                            let value = e.target.value;
-                            if (!/^\d{0,3}([.,]\d{0,2})?$/.test(value)) return;
-                            value = value.replace(',', '.');
-                            handleObjectiveChange(priorityIndex, currentObjectiveIndex, 'result', value);
-                          }}
-                          sx={{ mb: 2, mt: 1 }}
-                          inputProps={{ maxLength: 6 }}
-                          disabled={isObjectiveSettingPeriod}
-                        />
-
-                        <Box display="flex" justifyContent="right" alignItems="center" mt={2}>
-                          <IconButton
-                            onClick={() => {
-                              setObjectiveIndices((prevIndices) => {
-                                const newIndices = [...prevIndices];
-                                newIndices[priorityIndex] = Math.max(currentObjectiveIndex - 1, 0);
-                                return newIndices;
-                              });
-                            }}
-                            disabled={currentObjectiveIndex === 0}
-                            sx={{ color: 'success.main' }}
-                          >
-                            <KeyboardArrowLeft />
-                          </IconButton>
-                          <Typography variant="body1" sx={{ mx: 2 }}>
-                            {currentObjectiveIndex + 1} / {priority.objectives.length}
-                          </Typography>
-                          <IconButton
-                            onClick={() => {
-                              setObjectiveIndices((prevIndices) => {
-                                const newIndices = [...prevIndices];
-                                newIndices[priorityIndex] = Math.min(currentObjectiveIndex + 1, priority.objectives.length - 1);
-                                return newIndices;
-                              });
-                            }}
-                            disabled={currentObjectiveIndex === priority.objectives.length - 1}
-                            sx={{ color: 'success.main' }}
-                          >
-                            <KeyboardArrowRight />
-                          </IconButton>
-                        </Box>
-                      </>
-                    )}
-                  </Box>
-                </motion.div>
-              </AnimatePresence>
-            </MainCard>
-          );
-        })}
+        {renderObjectives()}
 
         {!isValidated && (
           <Box display="flex" justifyContent="center" mt={4}>
             <Button variant="contained" color="primary" onClick={handleValidateObjectives}>
-              Validate Objectives
+              Valider les Objectifs
             </Button>
           </Box>
         )}

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace EvaluationService.Models
 {
@@ -14,6 +15,7 @@ namespace EvaluationService.Models
         [Required]
         public bool IsActive { get; set; } = true;
 
+        [JsonIgnore]
         public ICollection<ObjectiveColumnValue> ObjectiveColumnValues { get; set; }
     }
 }

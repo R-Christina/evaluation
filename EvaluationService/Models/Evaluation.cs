@@ -35,6 +35,9 @@ namespace EvaluationService.Models
         [ForeignKey("EtatId")]
         public Etat Etat { get; set; }
 
+        public decimal? CompetenceWeightTotal { get; set; }
+        public decimal? IndicatorWeightTotal { get; set; }
+
         // Navigation properties
         [ForeignKey("TemplateId")]
         public FormTemplate FormTemplate { get; set; }

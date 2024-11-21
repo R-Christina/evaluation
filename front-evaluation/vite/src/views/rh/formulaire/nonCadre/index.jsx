@@ -20,35 +20,53 @@ import {
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
-import PanToolAltIcon from '@mui/icons-material/PanToolAlt';
 
 // Styled components for table cells and rows
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   border: `1px solid ${theme.palette.divider}`,
-  padding: '12px',
+  padding: '12px'
 }));
 
 const HeaderTableCell = styled(StyledTableCell)(({ theme }) => ({
   backgroundColor: theme.palette.primary.main,
   color: theme.palette.common.white,
-  textAlign: 'center',
+  textAlign: 'center'
 }));
 
 const TotalStyledTableCell = styled(StyledTableCell)(({ theme }) => ({
   backgroundColor: '#d4edda',
-  textAlign: 'center',
+  textAlign: 'center'
 }));
 
 const StyledTableRow = styled(TableRow)(({ theme }) => ({
   '&:nth-of-type(odd)': {
-    backgroundColor: theme.palette.action.hover,
-  },
+    backgroundColor: theme.palette.action.hover
+  }
 }));
 
 const Formulaire = () => {
-  const templateId = 4;
+  const [templateId, setTemplateId] = useState(null);
   const navigate = useNavigate();
   const [formTemplate, setFormTemplate] = useState(null);
+
+  useEffect(() => {
+    {
+      const fetchCadreTemplateId = async () => {
+        try {
+          const response = await formulaireInstance.get('/Template/NonCadreTemplate');
+          if (response.data?.templateId) {
+            setTemplateId(response.data.templateId);
+            console.log('templateId '+ response.data.templateId);
+          } else {
+            console.error('Template ID for Cadre not found in the response');
+          }
+        } catch (error) {
+          console.error('Error fetching Cadre template ID:', error);
+        }
+      };
+      fetchCadreTemplateId();
+    }
+  });
 
   useEffect(() => {
     const fetchTemplate = async () => {
@@ -64,7 +82,6 @@ const Formulaire = () => {
   }, [templateId]);
 
   const handleAddClick = () => navigate('/formulaireNonCadre/edit');
-  const handleUseClick = () => navigate('/formulaireNonCadre/use');
 
   return (
     <Paper sx={{ borderRadius: 0 }}>
@@ -78,9 +95,6 @@ const Formulaire = () => {
             <Button variant="outlined" onClick={handleAddClick} startIcon={<EditIcon />} sx={{ mr: 2 }}>
               Modifier
             </Button>
-            {/* <Button variant="outlined" onClick={handleUseClick} startIcon={<PanToolAltIcon />} sx={{ mr: 2 }}>
-              Utiliser
-            </Button> */}
             <IconButton size="small">
               <FileDownloadIcon color="primary" />
             </IconButton>
@@ -94,7 +108,9 @@ const Formulaire = () => {
         <Grid container spacing={4} sx={{ mb: 3, mt: 2 }}>
           <Grid item xs={6}>
             <Paper sx={{ padding: 2, borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
-              <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>COLLABORATEUR</Typography>
+              <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>
+                COLLABORATEUR
+              </Typography>
               <Divider sx={{ mb: 2 }} />
               <Typography variant="body1">Nom :</Typography>
               <Typography variant="body1">Prénom :</Typography>
@@ -106,7 +122,9 @@ const Formulaire = () => {
           </Grid>
           <Grid item xs={6}>
             <Paper sx={{ padding: 2, borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
-              <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>MANAGER</Typography>
+              <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>
+                MANAGER
+              </Typography>
               <Divider sx={{ mb: 2 }} />
               <Typography variant="body1">Nom :</Typography>
               <Typography variant="body1">Prénom :</Typography>
@@ -122,7 +140,7 @@ const Formulaire = () => {
                 {formTemplate?.levels?.map((level) => (
                   <HeaderTableCell key={level.levelId}>{level.levelName} %</HeaderTableCell>
                 ))}
-                <HeaderTableCell sx={{ backgroundColor: '#dfedff', color: 'black'}}>Performance en %</HeaderTableCell>
+                <HeaderTableCell sx={{ backgroundColor: '#dfedff', color: 'black' }}>Performance en %</HeaderTableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -131,17 +149,34 @@ const Formulaire = () => {
                   <StyledTableCell sx={{ fontSize: '0.8rem' }}>{competence.name}</StyledTableCell>
                   {formTemplate.levels.map((level) => {
                     const competenceLevel = competence.levels?.find((cl) => cl.levelId === level.levelId);
-                    return <StyledTableCell sx={{ fontSize: '0.8rem' }} key={level.levelId}>{competenceLevel ? competenceLevel.description : '-'}</StyledTableCell>;
+                    return (
+                      <StyledTableCell sx={{ fontSize: '0.8rem' }} key={level.levelId}>
+                        {competenceLevel ? competenceLevel.description : '-'}
+                      </StyledTableCell>
+                    );
                   })}
-                  <StyledTableCell sx={{ backgroundColor: '#F9F9F9'}}></StyledTableCell>
+                  <StyledTableCell sx={{ backgroundColor: '#F9F9F9' }}></StyledTableCell>
                 </StyledTableRow>
               ))}
+              {/* Ligne pour la pondération totale des indicateurs */}
+              <StyledTableRow>
+                <StyledTableCell colSpan={2} sx={{ fontWeight: 'bold', textAlign: 'left', backgroundColor: '#eaf3e0' }}>
+                  {' '}
+                  Pondération totale des indicateurs :{' '}
+                  {formTemplate?.competenceWeightTotal ? `${formTemplate.competenceWeightTotal} %` : '-'}
+                </StyledTableCell>
+                <StyledTableCell colSpan={4} sx={{ fontWeight: 'bold', textAlign: 'left', backgroundColor: '#eaf3e0' }}>
+                  {' '}
+                  TOTAL de la performance des indicateur
+                </StyledTableCell>
+                <StyledTableCell sx={{ fontWeight: 'bold', textAlign: 'center', backgroundColor: '#eaf3e0' }}>-</StyledTableCell>
+              </StyledTableRow>
             </TableBody>
           </Table>
         </TableContainer>
 
         <TableContainer component={Paper} sx={{ borderRadius: 0 }}>
-          <Table>
+          <Table sx={{ tableLayout: 'fixed', width: '100%' }}>
             <TableHead>
               <TableRow>
                 <HeaderTableCell>INDICATEURS METIERS</HeaderTableCell>
@@ -153,9 +188,7 @@ const Formulaire = () => {
               {formTemplate?.indicators?.map((indicator) => (
                 <React.Fragment key={indicator.indicatorId}>
                   <TableRow>
-                    <StyledTableCell rowSpan={indicator.maxResults + 1}>
-                      {indicator.label}
-                    </StyledTableCell>
+                    <StyledTableCell rowSpan={indicator.maxResults + 1}>{indicator.label}</StyledTableCell>
                   </TableRow>
                   {Array.from({ length: indicator.maxResults }).map((_, index) => (
                     <TableRow key={`${indicator.indicatorId}-${index}`}>
@@ -165,20 +198,48 @@ const Formulaire = () => {
                   ))}
                 </React.Fragment>
               ))}
+              {/* Ligne pour la performance totale */}
+              <StyledTableRow>
+                <StyledTableCell colSpan={1} sx={{ fontWeight: 'bold', textAlign: 'left', backgroundColor: '#eaf3e0' }}>
+                  TOTAL de la performance des indicateurs :{' '}
+                  {formTemplate?.indicatorWeightTotal ? `${formTemplate.indicatorWeightTotal} %` : '-'}
+                </StyledTableCell>
+                <StyledTableCell sx={{ fontWeight: 'bold', textAlign: 'center', backgroundColor: '#eaf3e0' }}>
+                  TOTAL de la performance des indicateur
+                </StyledTableCell>
+                <StyledTableCell sx={{ fontWeight: 'bold', textAlign: 'center', backgroundColor: '#eaf3e0' }}>-</StyledTableCell>
+              </StyledTableRow>
             </TableBody>
           </Table>
         </TableContainer>
 
+        <TableContainer component={Paper} sx={{ borderRadius: 0, mt: 5 }}>
+          <Table sx={{ tableLayout: 'fixed', width: '100%' }}>
+            <TableBody>
+              <StyledTableRow>
+                <StyledTableCell sx={{ fontWeight: 'bold', textAlign: 'left', backgroundColor: '#FFF9D1' }}>
+                  TOTAL pondération (100%): {formTemplate?.competenceWeightTotal != null && formTemplate?.indicatorWeightTotal != null
+                  ? `${formTemplate.competenceWeightTotal + formTemplate.indicatorWeightTotal} %`
+                  : '-'}
+                </StyledTableCell>
+                <StyledTableCell sx={{ fontWeight: 'bold', textAlign: 'left', backgroundColor: '#FFF9D1' }}>
+                  PERFORMANCE du contrat d'objectifs
+                </StyledTableCell>
+                <StyledTableCell sx={{ fontWeight: 'bold', textAlign: 'center', backgroundColor: '#eaf3e0' }}>-</StyledTableCell>
+              </StyledTableRow>
+            </TableBody>
+          </Table>
+        </TableContainer>
 
         <Grid container sx={{ mt: 4, justifyContent: 'space-between' }}>
           <Grid item xs={12}>
             {formTemplate?.helps?.map((help) => (
               <Box key={help.helpId} sx={{ mb: 3 }}>
                 {/* Affichage du nom du help */}
-                <Typography variant="body1" sx={{ mb: 1}}>
+                <Typography variant="body1" sx={{ mb: 1 }}>
                   {help.name}
                 </Typography>
-                
+
                 {/* Champ stylisé pour ressembler à un input */}
                 <Box
                   sx={{
@@ -188,24 +249,22 @@ const Formulaire = () => {
                     backgroundColor: '#f5f5f5',
                     color: '#666',
                     fontSize: '0.9rem',
+                    height: '100px'
                   }}
-                >
-                </Box>
+                ></Box>
               </Box>
             ))}
           </Grid>
         </Grid>
 
-
-
         <Grid container sx={{ mt: 2 }} spacing={4}>
           <Grid item xs={6} sx={{ textAlign: 'center' }}>
-              <Typography variant="body1">Signature Collaborateur</Typography>
-              <Box sx={{ height: '50px', border: '1px solid black' }} /> {/* Ligne pour signature */}
+            <Typography variant="body1">Signature Collaborateur</Typography>
+            <Box sx={{ height: '50px', border: '1px solid black' }} /> {/* Ligne pour signature */}
           </Grid>
           <Grid item xs={6} sx={{ textAlign: 'center' }}>
-              <Typography variant="body1">Signature Manager</Typography>
-              <Box sx={{ height: '50px', border: '1px solid black' }} /> {/* Ligne pour signature */}
+            <Typography variant="body1">Signature Manager</Typography>
+            <Box sx={{ height: '50px', border: '1px solid black' }} /> {/* Ligne pour signature */}
           </Grid>
         </Grid>
       </MainCard>

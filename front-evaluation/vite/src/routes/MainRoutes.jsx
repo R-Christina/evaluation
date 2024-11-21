@@ -36,7 +36,6 @@ const AssignationAll = Loadable(lazy(() => import('views/admin/utilisateur/Assig
 const ListeEval = Loadable(lazy(() => import('views/rh/evaluation/Liste')));
 const AjoutEval = Loadable(lazy(() => import('views/rh/evaluation/Ajout')));
 const FormulaireCadre = Loadable(lazy(() => import('views/rh/formulaire/cadre/Formulaire')));
-const EditFormulaireCadre = Loadable(lazy(() => import('views/rh/formulaire/cadre/EditFormCadre')));
 const FormulaireNonCadre = Loadable(lazy(() => import('views/rh/formulaire/nonCadre/index')));
 const EditFormulaireNonCadre = Loadable(lazy(() => import('views/rh/formulaire/nonCadre/EditFormNonCadre')));
 
@@ -44,8 +43,13 @@ const EditFormulaireNonCadre = Loadable(lazy(() => import('views/rh/formulaire/n
 const Remplissage = Loadable(lazy(() => import('views/collaborateur/evaluation/cadre/Remplissage')));
 const RemplissageNonCadre = Loadable(lazy(() => import('views/collaborateur/evaluation/nonCadre/Remplissage')));
 const MyEvaluation = Loadable(lazy(() => import('views/collaborateur/archive/MyEvaluation')));
-const EvaluationPhases = Loadable(lazy(() => import('views/collaborateur/archive/EvaluationPhases')));
 const EvaluationPhasesCadre = Loadable(lazy(() => import('views/collaborateur/archive/cadre/EvaluationPhasesCadre')));
+const EvaluationPhasesNonCadre = Loadable(lazy(() => import('views/collaborateur/archive/nonCadre/EvaluationPhasesNonCadre')));
+
+//manager
+const ListeSubordonne = Loadable(lazy(() => import('views/collaborateur/manager/Subordonne')));
+const FixationCadre = Loadable(lazy(() => import('views/collaborateur/manager/cadre/Fixation')));
+const FixationNonCadre = Loadable(lazy(() => import('views/collaborateur/manager/nonCadre/Fixation')));
 
 
 // sample page routing
@@ -232,16 +236,6 @@ const MainRoutes = {
     },
 
     {
-      path: 'formulaireCadre',
-      children: [
-        {
-          path: 'edit',
-          element: <EditFormulaireCadre />
-        }
-      ]
-    },
-
-    {
       path: 'formulaireNonCadre',
       children: [
         {
@@ -282,6 +276,36 @@ const MainRoutes = {
       ]
     },
 
+    //manager
+
+    {
+      path: 'manager',
+      children: [
+        {
+          path: 'subordonne',
+          element: <ListeSubordonne />
+        }
+      ]
+    },
+    {
+      path: 'manager',
+      children: [
+        {
+          path: 'fixation/:subordinateId/:typeUser',
+          element: <FixationCadre />
+        }
+      ]
+    },
+    {
+      path: 'manager',
+      children: [
+        {
+          path: 'fixationNonCadre/:subordinateId/:typeUser',
+          element: <FixationNonCadre />
+        }
+      ]
+    },
+
     //archive
     {
       path: 'archive',
@@ -298,6 +322,15 @@ const MainRoutes = {
         {
           path: 'evaluationPhasesCadre/:userId/:evalId',
           element: <EvaluationPhasesCadre />
+        }
+      ]
+    },
+    {
+      path: 'archive',
+      children: [
+        {
+          path: 'evaluationPhasesNonCadre/:userId/:evalId',
+          element: <EvaluationPhasesNonCadre />
         }
       ]
     }

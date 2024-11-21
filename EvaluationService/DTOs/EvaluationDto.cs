@@ -12,6 +12,8 @@ namespace EvaluationService.DTOs
         public string Titre { get; set; }
         public string? Type {get; set;}
         public string? EtatDesignation { get; set; }
+        public decimal? CompetenceWeightTotal { get; set; }
+        public decimal? IndicatorWeightTotal { get; set; }
 
     }
 }

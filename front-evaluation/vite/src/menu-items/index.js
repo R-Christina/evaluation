@@ -6,14 +6,14 @@ import dashboard from './dashboard';
 import evaluation from './evaluation';
 import admin from './admin'
 import archive from './archive'
-
+import manager from './manager'
 
 
 // ==============================|| MENU ITEMS ||============================== //
 
 const menuItems = {
   // items: [dashboard, pages, utilities, other, bonjour, evaluation]
-  items: [admin, dashboard, evaluation, archive]
+  items: [admin, dashboard, evaluation, manager, archive]
 
 };
 

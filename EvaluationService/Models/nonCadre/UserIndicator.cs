@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace EvaluationService.Models
 {
@@ -26,6 +27,7 @@ namespace EvaluationService.Models
 
         // Foreign Key and Navigation Property for UserEvaluation
         [ForeignKey("UserEvalId")]
+        [JsonIgnore]
         public virtual UserEvaluation UserEvaluation { get; set; }
 
         public virtual ICollection<UserIndicatorResult> UserIndicatorResults { get; set; }

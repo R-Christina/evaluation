@@ -23,6 +23,9 @@ namespace EvaluationService.Models
         public decimal Weighting { get; set; }
 
         [Required]
+        public string ValidatedBy {get; set;}
+
+        [Required]
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
         // Navigation property to UserEvaluations

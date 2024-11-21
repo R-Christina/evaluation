@@ -67,14 +67,14 @@ CREATE TABLE [Competences] (
     CONSTRAINT [FK_Competences_FormTemplates_TemplateId] FOREIGN KEY ([TemplateId]) REFERENCES [FormTemplates] ([TemplateId]) ON DELETE CASCADE
 );
 GO
-INSERT INTO [Competences] ([TemplateId], [Name]) VALUES (4, 'Compétence technique');
-INSERT INTO [Competences] ([TemplateId], [Name]) VALUES (4, 'Efficience');
-INSERT INTO [Competences] ([TemplateId], [Name]) VALUES (4, 'Qualité du travail');
-INSERT INTO [Competences] ([TemplateId], [Name]) VALUES (4, 'Assiduité');
-INSERT INTO [Competences] ([TemplateId], [Name]) VALUES (4, 'Comportement');
-INSERT INTO [Competences] ([TemplateId], [Name]) VALUES (4, 'Initiative');
-INSERT INTO [Competences] ([TemplateId], [Name]) VALUES (4, 'Organisation');
-INSERT INTO [Competences] ([TemplateId], [Name]) VALUES (4, 'Contrôle');
+INSERT INTO [Competences] ([TemplateId], [Name]) VALUES (2, 'Compétence technique');
+INSERT INTO [Competences] ([TemplateId], [Name]) VALUES (2, 'Efficience');
+INSERT INTO [Competences] ([TemplateId], [Name]) VALUES (2, 'Qualité du travail');
+INSERT INTO [Competences] ([TemplateId], [Name]) VALUES (2, 'Assiduité');
+INSERT INTO [Competences] ([TemplateId], [Name]) VALUES (2, 'Comportement');
+INSERT INTO [Competences] ([TemplateId], [Name]) VALUES (2, 'Initiative');
+INSERT INTO [Competences] ([TemplateId], [Name]) VALUES (2, 'Organisation');
+INSERT INTO [Competences] ([TemplateId], [Name]) VALUES (2, 'Contrôle');
 
 CREATE TABLE [Evaluations] (
     [EvalId] int NOT NULL IDENTITY,
@@ -101,10 +101,9 @@ CREATE TABLE [Indicators] (
     CONSTRAINT [FK_Indicators_FormTemplates_TemplateId] FOREIGN KEY ([TemplateId]) REFERENCES [FormTemplates] ([TemplateId]) ON DELETE CASCADE
 );
 GO
-insert into [Indicators] ([label],[MaxResults],[TemplateId]) values ('Indicateur 1', 3, 4);
-insert into [Indicators] ([label],[MaxResults],[TemplateId]) values ('Indicateur 2', 3, 4);
-insert into [Indicators] ([label],[MaxResults],[TemplateId]) values ('Indicateur 3', 3, 4);
-insert into [Indicators] ([label],[MaxResults],[TemplateId]) values ('Indicateur 4', 2, 4);
+insert into [Indicators] ([label],[MaxResults],[TemplateId]) values ('Indicateur 1', 3, 2);
+insert into [Indicators] ([label],[MaxResults],[TemplateId]) values ('Indicateur 2', 3, 2);
+insert into [Indicators] ([label],[MaxResults],[TemplateId]) values ('Indicateur 3', 3, 2);
 
 CREATE TABLE [TemplateStrategicPriorities] (
     [TemplatePriorityId] int NOT NULL IDENTITY,
@@ -408,8 +407,9 @@ ORDER BY
 SELECT E.EvalAnnee, E.EvalId
 FROM [Evaluations] E
 JOIN [UserEvaluations] U ON E.EvalId = U.EvalId
-WHERE E.EtatId = 3
-AND U.UserId = '18219f8e-b781-46ff-9182-37c9da640c03';
+WHERE (E.EtatId = 3 OR E.EtatId = 2)
+AND U.UserId = '4bbe3a90-2f91-40b9-bdb2-6efc48195f3a'
+AND E.Type = 'NonCadre';
 
 -- rudy: 4bbe3a90-2f91-40b9-bdb2-6efc48195f3a
 

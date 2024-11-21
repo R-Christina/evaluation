@@ -16,7 +16,7 @@ function MyEvaluation() {
   useEffect(() => {
     const fetchEvaluations = async () => {
       try {
-        const response = await formulaireInstance.get(`/archive/years/${userId}`);
+        const response = await formulaireInstance.get(`/archive/years/${userId}/${userType}`);
         if (response && response.data) {
           setEvaluationsByYear(response.data);
         } else {

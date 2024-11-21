@@ -25,6 +25,12 @@ namespace EvaluationService.Models
         public int UserEvalId { get; set; }
         public int PriorityId { get; set; }
 
+        [Required]
+        public string CreatedBy {get; set;}
+
+        [Required]
+        public DateTime CreatedAt {get; set;}
+
         // Navigation properties
         [ForeignKey("UserEvalId")]
         [JsonIgnore]

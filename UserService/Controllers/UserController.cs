@@ -888,6 +888,45 @@ namespace UserService.Controllers
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
+
+        [HttpGet("user/subordonates")]
+        public async Task<IEnumerable<UserDTO>> GetUsersBySuperiorIdAsync(string superiorId)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(superiorId))
+                {
+                    throw new ArgumentException("Superior ID must be provided.");
+                }
+
+                // Utiliser Entity Framework ou une autre méthode d'accès aux données pour interroger la base de données
+                var users = await _context.Users.Where(u => u.SuperiorId == superiorId).Select(u => new UserDTO
+                {
+                    Id = u.Id,
+                    Email = u.Email,
+                    Name = u.Name,
+                    Department = u.Department,
+                    Poste = u.Poste,
+                    SuperiorId = u.SuperiorId,
+                    SuperiorName = u.SuperiorName,
+                    Status = u.Status,
+                    TypeUser = u.TypeUser.HasValue ? u.TypeUser.ToString() : null,
+                    Habilitations = u.Habilitations.Select(h => new HabilitationIDLabelDto
+                    {
+                        Id = h.Id,
+                        Label = h.Label
+                    }).ToList()
+                }).ToListAsync();
+
+                return users;
+            }
+            catch (Exception ex)
+            {
+                // Log the error
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                throw;
+            }
+        }
  
         // ACTUALIZE
         // [HttpPost("Actualize")]

@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace EvaluationService.Models
 {
@@ -16,6 +17,7 @@ namespace EvaluationService.Models
 
         // Navigation properties
         [ForeignKey("ObjectiveId")]
+        [JsonIgnore]
         public UserObjective UserObjective { get; set; }
 
         [ForeignKey("ColumnId")]

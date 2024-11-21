@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -12,12 +12,16 @@ import {
   TableCell,
   TableContainer,
   TableHead,
-  TableRow
+  TableRow,
+  IconButton
 } from '@mui/material';
 import FolderIcon from '@mui/icons-material/Folder';
 import MainCard from 'ui-component/cards/MainCard';
 import { formulaireInstance } from '../../../../axiosConfig';
 import { useParams } from 'react-router-dom';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 function EvaluationPhasesCadre() {
   const { userId, evalId } = useParams();
@@ -31,6 +35,8 @@ function EvaluationPhasesCadre() {
   const poste = user.poste;
   const departement = user.department;
   const superiorName = user.superiorName;
+
+  const printRef = useRef();
 
   useEffect(() => {
     // Charger la phase "Fixation" par défaut
@@ -130,9 +136,50 @@ function EvaluationPhasesCadre() {
     return acc;
   }, {});
 
+  const columnNames = Array.from(
+    new Set(historyByPhase.flatMap((objective) => objective.columnValues || []).map((column) => column.columnName))
+  );
+
+  const exportPDF = () => {
+    const input = printRef.current;
+    html2canvas(input, { scale: 2 })
+      .then((canvas) => {
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'pt',
+          format: 'a4'
+        });
+
+        const imgProps = pdf.getImageProperties(imgData);
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        pdf.save(`${userNon} formulaire_Cadre.pdf`);
+      })
+      .catch((err) => {
+        console.error('Erreur lors de la génération du PDF', err);
+      });
+  };
+
   return (
     <Paper>
       <MainCard>
+        <Grid container alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
+          <Grid item>
+            <Typography variant="subtitle2">Archive</Typography>
+            <Typography variant="h3" sx={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
+              Formulaire d’évaluation
+            </Typography>
+          </Grid>
+          <Grid item>
+            <IconButton size="small" onClick={exportPDF}>
+              <FileDownloadIcon color="primary" />
+            </IconButton>
+          </Grid>
+        </Grid>
+
         <Grid container spacing={3}>
           {['Fixation', 'Mi-Parcours'].map((phase) => (
             <Grid item xs={12} sm={6} md={4} key={phase}>
@@ -158,160 +205,166 @@ function EvaluationPhasesCadre() {
           ))}
         </Grid>
 
-        {evaluationDetails && (
-          <Typography variant="h4" align="center" sx={{ backgroundColor: '#d4edda', padding: 1, fontWeight: 'bold', mt: 5 }}>
-            {evaluationDetails.titre}
-          </Typography>
-        )}
-
-        <Grid container spacing={4} sx={{ mb: 3, mt: 2 }}>
-          <Grid item xs={6}>
-            <Paper sx={{ padding: 2, borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
-              <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>
-                COLLABORATEUR
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-              <Typography variant="body1">
-                Nom : <span style={{ color: '#3949AB' }}>{userNon}</span>
-              </Typography>
-              <Typography variant="body1">Matricule :</Typography>
-              <Typography variant="body1">
-                Poste : <span style={{ color: '#3949AB' }}>{poste}</span>
-              </Typography>
-              <Typography variant="body1">
-                Département : <span style={{ color: '#3949AB' }}>{departement}</span>
-              </Typography>
-            </Paper>
-          </Grid>
-          <Grid item xs={6}>
-            <Paper sx={{ padding: 2, borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
-              <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>
-                MANAGER
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-              <Typography variant="body1">
-                Nom : <span style={{ color: '#3949AB' }}>{superiorName}</span>
-              </Typography>
-            </Paper>
-          </Grid>
-        </Grid>
-
-        <TableContainer sx={{ border: '1px solid #ddd', borderRadius: '4px', mt: 4 }}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ borderRight: '1px solid #ddd', backgroundColor: '#3f51b5', color: 'white' }}>
-                  PRIORITÉS STRATÉGIQUES
-                </TableCell>
-                <TableCell sx={{ borderRight: '1px solid #ddd', backgroundColor: '#3f51b5', color: 'white' }}>OBJECTIFS</TableCell>
-                <TableCell sx={{ borderRight: '1px solid #ddd', backgroundColor: '#3f51b5', color: 'white' }}>PONDÉRATION</TableCell>
-                <TableCell sx={{ borderRight: '1px solid #ddd', backgroundColor: '#3f51b5', color: 'white' }}>
-                  INDICATEURS DE RÉSULTAT
-                </TableCell>
-                <TableCell sx={{ backgroundColor: '#3f51b5', color: 'white' }}>RÉSULTATS en % d’atteinte sur 100%</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {Object.entries(groupedData).map(([priorityName, objectives]) => (
-                <React.Fragment key={priorityName}>
-                  <TableRow>
-                    <TableCell
-                      rowSpan={objectives.length + 2}
-                      sx={{ borderRight: '1px solid #ddd', fontWeight: 'bold', verticalAlign: 'top' }}
-                    >
-                      {priorityName}
-                      <Typography variant="caption" display="block">
-                        {/* ({objectives[0].weighting}% / {objectives[0].totalWeighting || 0}%) */}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                  {objectives.map((objective, index) => (
-                    <TableRow key={objective.historyId}>
-                      <TableCell sx={{ borderRight: '1px solid #ddd' }}>
-                        {objective.description && objective.description !== 'N/A' ? objective.description : ' '}
-                      </TableCell>
-                      <TableCell sx={{ borderRight: '1px solid #ddd' }}>
-                        {objective.weighting && objective.weighting !== 0 ? `${objective.weighting}%` : ' '}
-                      </TableCell>
-                      <TableCell sx={{ borderRight: '1px solid #ddd' }}>
-                        {objective.resultIndicator && objective.resultIndicator !== 'N/A' ? objective.resultIndicator : ' '}
-                      </TableCell>
-                      <TableCell>{objective.result && objective.result !== 0 ? `${objective.result}%` : ' '}</TableCell>
-                    </TableRow>
-                  ))}
-                  <TableRow sx={{ backgroundColor: '#e8f5e9' }}>
-                    <TableCell colSpan={1} sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#000', borderRight: '1px solid #ddd' }}>
-                      Sous-total de pondération
-                    </TableCell>
-                    <TableCell sx={{ fontSize: '0.8rem', color: '#000', borderRight: '1px solid #ddd' }}>
-                      {objectives[0].totalWeighting || 0} %
-                    </TableCell>
-                    <TableCell sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#000', borderRight: '1px solid #ddd' }}>
-                      Sous-total résultats
-                    </TableCell>
-                    <TableCell sx={{ fontSize: '0.8rem', color: '#000' }}>{objectives[0].totalResult || 0} %</TableCell>
-                  </TableRow>
-                </React.Fragment>
-              ))}
-              <TableRow>
-                <TableCell
-                  colSpan={1}
-                  sx={{ backgroundColor: 'transparent', fontWeight: 'bold', color: '#000', borderRight: '1px solid #ddd' }}
-                >
-                </TableCell>
-                <TableCell
-                  sx={{ backgroundColor: '#fff9d1', fontWeight: 'bold', color: '#000', borderRight: '1px solid #ddd' }}
-                >
-                  TOTAL PONDÉRATION (100%)
-                </TableCell>
-                <TableCell sx={{ backgroundColor: '#fff9d1', color: '#000', borderRight: '1px solid #ddd' }}>
-                  {totalWeightingSum} %
-                </TableCell>
-                <TableCell sx={{ backgroundColor: '#fff9d1', fontWeight: 'bold', color: '#000', borderRight: '1px solid #ddd' }}>
-                  PERFORMANCE du contrat d'objectifs
-                </TableCell>
-                <TableCell sx={{ backgroundColor: '#fff9d1', color: '#000' }}>{totalResultSum} %</TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </TableContainer>
-
-        <Grid container sx={{ mt: 4, justifyContent: 'space-between' }}>
-          <Grid item xs={12}>
-            <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
-              Dates Importantes
+        <Box sx={{ padding: 2 }} ref={printRef}>
+          {evaluationDetails && (
+            <Typography variant="h4" align="center" sx={{ backgroundColor: '#d4edda', padding: 1, fontWeight: 'bold', mt: 2 }}>
+              {evaluationDetails.titre}
             </Typography>
-            <Box sx={{ border: '1px solid #ddd', borderRadius: '8px', padding: 2, backgroundColor: '#f9f9f9' }}>
-              <Typography variant="body1" sx={{ mb: 1 }}>
-                Date de fixation des objectifs :{' '}
-                {new Date(evaluationDetails?.fixationObjectif).toLocaleDateString('fr-FR', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 1 }}>
-                Date évaluation mi-parcours :{' '}
-                {new Date(evaluationDetails?.miParcours).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}
-              </Typography>
-              <Typography variant="body1">
-                Date de l'entretien final :{' '}
-                {new Date(evaluationDetails?.final).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}
-              </Typography>
-            </Box>
-          </Grid>
-        </Grid>
+          )}
 
-        <Grid container sx={{ mt: 2 }} spacing={4}>
-          <Grid item xs={6} sx={{ textAlign: 'center' }}>
-            <Typography variant="body1">Signature Collaborateur</Typography>
-            <Box sx={{ height: '50px', border: '1px solid black' }} />
+          <Grid container spacing={4} sx={{ mb: 3, mt: 2 }}>
+            <Grid item xs={6}>
+              <Paper sx={{ padding: 2, borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
+                <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>
+                  COLLABORATEUR
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                <Typography variant="body1">
+                  Nom : <span style={{ color: '#3949AB' }}>{userNon}</span>
+                </Typography>
+                <Typography variant="body1">Matricule :</Typography>
+                <Typography variant="body1">
+                  Poste : <span style={{ color: '#3949AB' }}>{poste}</span>
+                </Typography>
+                <Typography variant="body1">
+                  Département : <span style={{ color: '#3949AB' }}>{departement}</span>
+                </Typography>
+              </Paper>
+            </Grid>
+            <Grid item xs={6}>
+              <Paper sx={{ padding: 2, borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
+                <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>
+                  MANAGER
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                <Typography variant="body1">
+                  Nom : <span style={{ color: '#3949AB' }}>{superiorName}</span>
+                </Typography>
+              </Paper>
+            </Grid>
           </Grid>
-          <Grid item xs={6} sx={{ textAlign: 'center' }}>
-            <Typography variant="body1">Signature Manager</Typography>
-            <Box sx={{ height: '50px', border: '1px solid black' }} />
+
+          <TableContainer sx={{ border: '1px solid #ddd', borderRadius: '4px', mt: 4 }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ borderRight: '1px solid #ddd', backgroundColor: '#3f51b5', color: 'white' }}>
+                    PRIORITÉS STRATÉGIQUES
+                  </TableCell>
+                  <TableCell sx={{ borderRight: '1px solid #ddd', backgroundColor: '#3f51b5', color: 'white' }}>OBJECTIFS</TableCell>
+                  <TableCell sx={{ borderRight: '1px solid #ddd', backgroundColor: '#3f51b5', color: 'white' }}>PONDÉRATION</TableCell>
+                  <TableCell sx={{ borderRight: '1px solid #ddd', backgroundColor: '#3f51b5', color: 'white' }}>
+                    INDICATEURS DE RÉSULTAT
+                  </TableCell>
+                  <TableCell sx={{ backgroundColor: '#3f51b5', color: 'white' }}>RÉSULTATS en % d’atteinte sur 100%</TableCell>
+                  {columnNames.map((columnName, index) => (
+                    <TableCell key={index} sx={{ backgroundColor: '#DFEDFF', color: 'black' }}>
+                      {columnName}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {Object.entries(groupedData).map(([priorityName, objectives]) => (
+                  <React.Fragment key={priorityName}>
+                    <TableRow>
+                      <TableCell
+                        rowSpan={objectives.length + 2}
+                        sx={{ borderRight: '1px solid #ddd', fontWeight: 'bold', verticalAlign: 'top' }}
+                      >
+                        {priorityName}
+                        <Typography variant="caption" display="block">
+                          {/* ({objectives[0].weighting}% / {objectives[0].totalWeighting || 0}%) */}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                    {objectives.map((objective) => (
+                      <TableRow key={objective.historyId}>
+                        <TableCell sx={{ borderRight: '1px solid #ddd' }}>
+                          {objective.description && objective.description !== 'N/A' ? objective.description : ' '}
+                        </TableCell>
+                        <TableCell sx={{ borderRight: '1px solid #ddd' }}>
+                          {objective.weighting && objective.weighting !== 0 ? `${objective.weighting}%` : ' '}
+                        </TableCell>
+                        <TableCell sx={{ borderRight: '1px solid #ddd' }}>
+                          {objective.resultIndicator && objective.resultIndicator !== 'N/A' ? objective.resultIndicator : ' '}
+                        </TableCell>
+                        <TableCell sx={{ borderRight: '1px solid #ddd' }}>
+                          {objective.result && objective.result !== 0 ? `${objective.result}%` : ' '}
+                        </TableCell>
+                          {objective.columnValues && objective.columnValues.length > 0 ? (
+                            objective.columnValues.map((column, index) => (
+                              <TableCell key={index} sx={{ borderRight: '1px solid #ddd' }}>
+                                {column.value !== "N/A" ? column.value : ""}
+                              </TableCell>
+                            ))
+                          ) : (
+                            <TableCell sx={{ borderRight: '1px solid #ddd' }}>Aucune donnée</TableCell>
+                          )}
+                      </TableRow>
+                    ))}
+                    <TableRow sx={{ backgroundColor: '#e8f5e9' }}>
+                      <TableCell colSpan={1} sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#000', borderRight: '1px solid #ddd' }}>
+                        Sous-total de pondération
+                      </TableCell>
+                      <TableCell sx={{ fontSize: '0.8rem', color: '#000', borderRight: '1px solid #ddd' }}>
+                        {objectives[0].totalWeighting || 0} %
+                      </TableCell>
+                      <TableCell sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#000', borderRight: '1px solid #ddd' }}>
+                        Sous-total résultats
+                      </TableCell>
+                      <TableCell sx={{ fontSize: '0.8rem', color: '#000' }}>{objectives[0].totalResult || 0} %</TableCell>
+                    </TableRow>
+                  </React.Fragment>
+                ))}
+                <TableRow>
+                  <TableCell colSpan={1} sx={{ backgroundColor: 'transparent' }}></TableCell>
+                  <TableCell sx={{ backgroundColor: '#fff9d1' }}>TOTAL PONDÉRATION (100%)</TableCell>
+                  <TableCell sx={{ backgroundColor: '#fff9d1' }}>{totalWeightingSum}%</TableCell>
+                  <TableCell sx={{ backgroundColor: '#fff9d1' }}>PERFORMANCE du contrat d'objectifs</TableCell>
+                  <TableCell sx={{ backgroundColor: '#fff9d1' }}>{totalResultSum}%</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          <Grid container sx={{ mt: 4, justifyContent: 'space-between' }}>
+            <Grid item xs={12}>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
+                Dates Importantes
+              </Typography>
+              <Box sx={{ border: '1px solid #ddd', borderRadius: '8px', padding: 2, backgroundColor: '#f9f9f9' }}>
+                <Typography variant="body1" sx={{ mb: 1 }}>
+                  Date de fixation des objectifs :{' '}
+                  {new Date(evaluationDetails?.fixationObjectif).toLocaleDateString('fr-FR', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </Typography>
+                <Typography variant="body1" sx={{ mb: 1 }}>
+                  Date évaluation mi-parcours :{' '}
+                  {new Date(evaluationDetails?.miParcours).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}
+                </Typography>
+                <Typography variant="body1">
+                  Date de l'entretien final :{' '}
+                  {new Date(evaluationDetails?.final).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}
+                </Typography>
+              </Box>
+            </Grid>
           </Grid>
-        </Grid>
+
+          <Grid container sx={{ mt: 2 }} spacing={4}>
+            <Grid item xs={6} sx={{ textAlign: 'center' }}>
+              <Typography variant="body1">Signature Collaborateur</Typography>
+              <Box sx={{ height: '100px', border: '1px solid black' }} />
+            </Grid>
+            <Grid item xs={6} sx={{ textAlign: 'center' }}>
+              <Typography variant="body1">Signature Manager</Typography>
+              <Box sx={{ height: '100px', border: '1px solid black' }} />
+            </Grid>
+          </Grid>
+        </Box>
       </MainCard>
     </Paper>
   );

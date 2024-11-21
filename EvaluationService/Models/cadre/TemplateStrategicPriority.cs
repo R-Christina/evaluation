@@ -19,6 +19,9 @@ namespace EvaluationService.Models
         // Foreign key
         public int TemplateId { get; set; }
 
+        [Required]
+        public bool IsActif { get; set; } = true;
+
         // Navigation properties
         [ForeignKey("TemplateId")]
         public FormTemplate FormTemplate { get; set; }

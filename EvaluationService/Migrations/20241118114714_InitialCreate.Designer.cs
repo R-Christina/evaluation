@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EvaluationService.Migrations
 {
     [DbContext(typeof(AppdbContext))]
-    [Migration("20241112061911_UpdateUserObjective")]
-    partial class UpdateUserObjective
+    [Migration("20241118114714_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -100,6 +100,9 @@ namespace EvaluationService.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EvalId"));
 
+                    b.Property<decimal?>("CompetenceWeightTotal")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<int>("EtatId")
                         .HasColumnType("int");
 
@@ -111,6 +114,9 @@ namespace EvaluationService.Migrations
 
                     b.Property<DateTime>("FixationObjectif")
                         .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("IndicatorWeightTotal")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime>("MiParcours")
                         .HasColumnType("datetime2");
@@ -200,6 +206,10 @@ namespace EvaluationService.Migrations
 
                     b.Property<int>("UserEvalId")
                         .HasColumnType("int");
+
+                    b.Property<string>("ValidatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("Weighting")
                         .HasColumnType("decimal(18,2)");
@@ -310,6 +320,115 @@ namespace EvaluationService.Migrations
                     b.ToTable("HistoryObjectiveColumnValuesMps");
                 });
 
+            modelBuilder.Entity("EvaluationService.Models.HistoryUserCompetenceFO", b =>
+                {
+                    b.Property<int>("HistoryUserCompetenceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("HistoryUserCompetenceId"));
+
+                    b.Property<string>("CompetenceName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("Performance")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("UserEvalId")
+                        .HasColumnType("int");
+
+                    b.HasKey("HistoryUserCompetenceId");
+
+                    b.HasIndex("UserEvalId");
+
+                    b.ToTable("HistoryUserCompetenceFOs");
+                });
+
+            modelBuilder.Entity("EvaluationService.Models.HistoryUserCompetenceMP", b =>
+                {
+                    b.Property<int>("HistoryUserCompetenceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("HistoryUserCompetenceId"));
+
+                    b.Property<string>("CompetenceName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("Performance")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("UserEvalId")
+                        .HasColumnType("int");
+
+                    b.HasKey("HistoryUserCompetenceId");
+
+                    b.HasIndex("UserEvalId");
+
+                    b.ToTable("HistoryUserCompetenceMPs");
+                });
+
+            modelBuilder.Entity("EvaluationService.Models.HistoryUserIndicatorFO", b =>
+                {
+                    b.Property<int>("HistoryUserIndicatorFOId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("HistoryUserIndicatorFOId"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<decimal?>("Result")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ResultText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("UserEvalId")
+                        .HasColumnType("int");
+
+                    b.HasKey("HistoryUserIndicatorFOId");
+
+                    b.HasIndex("UserEvalId");
+
+                    b.ToTable("HistoryUserIndicatorFOs");
+                });
+
+            modelBuilder.Entity("EvaluationService.Models.HistoryUserIndicatorMP", b =>
+                {
+                    b.Property<int>("HistoryUserIndicatorMPId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("HistoryUserIndicatorMPId"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<decimal>("Result")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ResultText")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("UserEvalId")
+                        .HasColumnType("int");
+
+                    b.HasKey("HistoryUserIndicatorMPId");
+
+                    b.HasIndex("UserEvalId");
+
+                    b.ToTable("HistoryUserIndicatorMPs");
+                });
+
             modelBuilder.Entity("EvaluationService.Models.Indicator", b =>
                 {
                     b.Property<int>("IndicatorId")
@@ -409,6 +528,9 @@ namespace EvaluationService.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TemplatePriorityId"));
 
+                    b.Property<bool>("IsActif")
+                        .HasColumnType("bit");
+
                     b.Property<int>("MaxObjectives")
                         .HasColumnType("int");
 
@@ -425,6 +547,32 @@ namespace EvaluationService.Migrations
                     b.HasIndex("TemplateId");
 
                     b.ToTable("TemplateStrategicPriorities");
+                });
+
+            modelBuilder.Entity("EvaluationService.Models.UserCompetence", b =>
+                {
+                    b.Property<int>("UserCompetenceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("UserCompetenceId"));
+
+                    b.Property<int>("CompetenceId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Performance")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("UserEvalId")
+                        .HasColumnType("int");
+
+                    b.HasKey("UserCompetenceId");
+
+                    b.HasIndex("CompetenceId");
+
+                    b.HasIndex("UserEvalId");
+
+                    b.ToTable("UserCompetences");
                 });
 
             modelBuilder.Entity("EvaluationService.Models.UserEvaluation", b =>
@@ -447,6 +595,30 @@ namespace EvaluationService.Migrations
                     b.HasIndex("EvalId");
 
                     b.ToTable("UserEvaluations");
+                });
+
+            modelBuilder.Entity("EvaluationService.Models.UserEvaluationWeight", b =>
+                {
+                    b.Property<int>("WeightId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("WeightId"));
+
+                    b.Property<decimal>("CompetenceWeightTotal")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("IndicatorWeightTotal")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("TemplateId")
+                        .HasColumnType("int");
+
+                    b.HasKey("WeightId");
+
+                    b.HasIndex("TemplateId");
+
+                    b.ToTable("UserEvaluationWeights");
                 });
 
             modelBuilder.Entity("EvaluationService.Models.UserHelpContent", b =>
@@ -487,9 +659,6 @@ namespace EvaluationService.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("UserIndicatorId"));
 
-                    b.Property<decimal?>("AttainmentPercentage")
-                        .HasColumnType("decimal(18,2)");
-
                     b.Property<int>("IndicatorId")
                         .HasColumnType("int");
 
@@ -518,8 +687,8 @@ namespace EvaluationService.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ResultId"));
 
-                    b.Property<int>("LineNumber")
-                        .HasColumnType("int");
+                    b.Property<decimal>("Result")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("ResultText")
                         .IsRequired()
@@ -542,6 +711,13 @@ namespace EvaluationService.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ObjectiveId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -666,6 +842,50 @@ namespace EvaluationService.Migrations
                     b.Navigation("HistoryCMp");
                 });
 
+            modelBuilder.Entity("EvaluationService.Models.HistoryUserCompetenceFO", b =>
+                {
+                    b.HasOne("EvaluationService.Models.UserEvaluation", "UserEvaluation")
+                        .WithMany()
+                        .HasForeignKey("UserEvalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("UserEvaluation");
+                });
+
+            modelBuilder.Entity("EvaluationService.Models.HistoryUserCompetenceMP", b =>
+                {
+                    b.HasOne("EvaluationService.Models.UserEvaluation", "UserEvaluation")
+                        .WithMany()
+                        .HasForeignKey("UserEvalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("UserEvaluation");
+                });
+
+            modelBuilder.Entity("EvaluationService.Models.HistoryUserIndicatorFO", b =>
+                {
+                    b.HasOne("EvaluationService.Models.UserEvaluation", "UserEvaluation")
+                        .WithMany()
+                        .HasForeignKey("UserEvalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("UserEvaluation");
+                });
+
+            modelBuilder.Entity("EvaluationService.Models.HistoryUserIndicatorMP", b =>
+                {
+                    b.HasOne("EvaluationService.Models.UserEvaluation", "UserEvaluation")
+                        .WithMany()
+                        .HasForeignKey("UserEvalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("UserEvaluation");
+                });
+
             modelBuilder.Entity("EvaluationService.Models.Indicator", b =>
                 {
                     b.HasOne("EvaluationService.Models.FormTemplate", "FormTemplate")
@@ -707,6 +927,25 @@ namespace EvaluationService.Migrations
                     b.Navigation("FormTemplate");
                 });
 
+            modelBuilder.Entity("EvaluationService.Models.UserCompetence", b =>
+                {
+                    b.HasOne("EvaluationService.Models.Competence", "Competence")
+                        .WithMany("UserCompetences")
+                        .HasForeignKey("CompetenceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EvaluationService.Models.UserEvaluation", "UserEvaluation")
+                        .WithMany()
+                        .HasForeignKey("UserEvalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Competence");
+
+                    b.Navigation("UserEvaluation");
+                });
+
             modelBuilder.Entity("EvaluationService.Models.UserEvaluation", b =>
                 {
                     b.HasOne("EvaluationService.Models.Evaluation", "Evaluation")
@@ -716,6 +955,17 @@ namespace EvaluationService.Migrations
                         .IsRequired();
 
                     b.Navigation("Evaluation");
+                });
+
+            modelBuilder.Entity("EvaluationService.Models.UserEvaluationWeight", b =>
+                {
+                    b.HasOne("EvaluationService.Models.FormTemplate", "FormTemplate")
+                        .WithMany()
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FormTemplate");
                 });
 
             modelBuilder.Entity("EvaluationService.Models.UserHelpContent", b =>
@@ -789,6 +1039,8 @@ namespace EvaluationService.Migrations
             modelBuilder.Entity("EvaluationService.Models.Competence", b =>
                 {
                     b.Navigation("CompetenceLevels");
+
+                    b.Navigation("UserCompetences");
                 });
 
             modelBuilder.Entity("EvaluationService.Models.Evaluation", b =>

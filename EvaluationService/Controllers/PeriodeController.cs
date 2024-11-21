@@ -26,6 +26,7 @@ namespace EvaluationService.Controllers
         {
             return await _context.Evaluations
                 .Include(e => e.Etat)
+                .OrderByDescending(e => e.EvalAnnee) // Trier par année du plus récent au plus ancien
                 .Select(e => new EvaluationDto
                 {
                     EvalId = e.EvalId,
@@ -74,6 +75,29 @@ namespace EvaluationService.Controllers
                 return BadRequest(new { Success = false, Errors = errorMessages });
             }
 
+            // Fetching the template
+            var template = await _context.FormTemplates.FirstOrDefaultAsync(t => t.TemplateId == evaluationDto.TemplateId);
+            if (template == null)
+            {
+                return NotFound(new { Success = false, Message = "Template non trouvé." });
+            }
+
+            decimal competenceWeightTotal = 0;
+            decimal indicatorWeightTotal = 0;
+
+            // Récupérer la pondération uniquement si le type n'est pas "Cadre"
+            if (evaluationDto.Type == "NonCadre")
+            {
+                var userEvaluationWeights = await _context.UserEvaluationWeights.FirstOrDefaultAsync(w => w.TemplateId == evaluationDto.TemplateId);
+                if (userEvaluationWeights == null)
+                {
+                    return NotFound(new { Success = false, Message = "Pondération pour le template non trouvée." });
+                }
+
+                competenceWeightTotal = userEvaluationWeights.CompetenceWeightTotal;
+                indicatorWeightTotal = userEvaluationWeights.IndicatorWeightTotal;
+            }
+
             var evaluation = new Evaluation
             {
                 EvalAnnee = evaluationDto.EvalAnnee,
@@ -82,8 +106,10 @@ namespace EvaluationService.Controllers
                 Final = evaluationDto.Final,
                 EtatId = evaluationDto.EtatId,
                 TemplateId = evaluationDto.TemplateId,
+                Titre = evaluationDto.Titre,
                 Type = evaluationDto.Type,
-                Titre = evaluationDto.Titre
+                CompetenceWeightTotal = competenceWeightTotal,
+                IndicatorWeightTotal = indicatorWeightTotal
             };
 
             try
@@ -152,6 +178,66 @@ namespace EvaluationService.Controllers
             return evaluationsWithPeriod;
         }
 
+        [HttpGet("periodeActuel/{evalId}")]
+        public async Task<ActionResult<EvaluationPeriodDto>> GetPeriodeActuelById(int evalId)
+        {
+            try
+            {
+                // Récupérer l'évaluation par son ID
+                var eval = await _context.Evaluations
+                    .Where(e => e.EvalId == evalId)
+                    .FirstOrDefaultAsync();
+
+                if (eval == null)
+                {
+                    return NotFound(new { Message = $"Aucune évaluation trouvée pour l'ID {evalId}." });
+                }
+
+                // Déterminer la période actuelle
+                DateTime currentDate = DateTime.Now;
+                string period;
+
+                if (currentDate >= eval.FixationObjectif && currentDate < eval.MiParcours)
+                {
+                    period = "Fixation Objectif";
+                }
+                else if (currentDate >= eval.MiParcours && currentDate < eval.Final)
+                {
+                    period = "Mi-Parcours";
+                }
+                else if (currentDate >= eval.Final)
+                {
+                    period = "Évaluation Finale";
+                }
+                else
+                {
+                    period = "Hors période d'évaluation";
+                }
+
+                // Créer l'objet DTO avec les détails de l'évaluation
+                var evaluationPeriod = new EvaluationPeriodDto
+                {
+                    EvalId = eval.EvalId,
+                    EvalAnnee = eval.EvalAnnee,
+                    FixationObjectif = eval.FixationObjectif,
+                    MiParcours = eval.MiParcours,
+                    Final = eval.Final,
+                    EtatId = eval.EtatId,
+                    TemplateId = eval.TemplateId,
+                    Titre = eval.Titre,
+                    Type = eval.Type,
+                    CurrentPeriod = period
+                };
+
+                return Ok(evaluationPeriod);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = $"Erreur lors de la récupération de la période actuelle : {ex.Message}" });
+            }
+        }
+
+
 
         [HttpGet("enCours")]
         public async Task<List<EvaluationDto>> GetEnCours(int etatId = 2, string type = null)
@@ -184,7 +270,7 @@ namespace EvaluationService.Controllers
         }
 
 
-        [HttpPut("edit/{evalId}")]  
+        [HttpPut("edit/{evalId}")]
         public async Task<IActionResult> ModifyEvaluation(int evalId, [FromBody] EvaluationDto evaluationDto, [FromQuery] string userId)
         {
             int requiredHabilitationAdminId = 2;

@@ -31,6 +31,7 @@ const Ajout = () => {
       try {
         const response = await formulaireInstance.get('/Template/GetAllTemplates');
         setTemplates(response.data);
+        console.log(response.data);
       } catch (error) {
         console.error("Erreur lors de la récupération des templates:", error);
       }
@@ -72,10 +73,8 @@ const Ajout = () => {
           type: '',
         });
 
-        // Redirection après un délai de 2 secondes pour permettre à l'utilisateur de lire le message de succès
-        setTimeout(() => {
-          navigate('/evaluation/listeEvaluation'); // Remplacez '/evaluations' par le chemin souhaité
-        }, 2000);
+
+        navigate('/evaluation/listeEvaluation');
       }
     } catch (error) {
       const errors = error.response?.data?.Errors;

@@ -20,6 +20,12 @@ namespace EvaluationService.Models
 
         public decimal? Result { get; set; }
 
+        [Required]
+        public string ValidatedBy {get; set;}
+
+        [Required]
+        public DateTime CreatedAt {get; set;}
+
         public virtual UserEvaluation UserEvaluation { get; set; }
     }
 }

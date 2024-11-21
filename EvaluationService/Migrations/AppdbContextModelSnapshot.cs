@@ -97,6 +97,9 @@ namespace EvaluationService.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EvalId"));
 
+                    b.Property<decimal?>("CompetenceWeightTotal")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<int>("EtatId")
                         .HasColumnType("int");
 
@@ -108,6 +111,9 @@ namespace EvaluationService.Migrations
 
                     b.Property<DateTime>("FixationObjectif")
                         .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("IndicatorWeightTotal")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime>("MiParcours")
                         .HasColumnType("datetime2");
@@ -198,6 +204,10 @@ namespace EvaluationService.Migrations
                     b.Property<int>("UserEvalId")
                         .HasColumnType("int");
 
+                    b.Property<string>("ValidatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<decimal>("Weighting")
                         .HasColumnType("decimal(18,2)");
 
@@ -239,6 +249,10 @@ namespace EvaluationService.Migrations
                     b.Property<int>("UserEvalId")
                         .HasColumnType("int");
 
+                    b.Property<string>("ValidatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<decimal>("Weighting")
                         .HasColumnType("decimal(18,2)");
 
@@ -266,6 +280,10 @@ namespace EvaluationService.Migrations
 
                     b.Property<int>("HcfId")
                         .HasColumnType("int");
+
+                    b.Property<string>("ValidatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Value")
                         .IsRequired()
@@ -295,6 +313,10 @@ namespace EvaluationService.Migrations
 
                     b.Property<int>("HcmId")
                         .HasColumnType("int");
+
+                    b.Property<string>("ValidatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Value")
                         .IsRequired()
@@ -365,6 +387,9 @@ namespace EvaluationService.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("HistoryUserIndicatorFOId"));
 
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -378,6 +403,10 @@ namespace EvaluationService.Migrations
 
                     b.Property<int>("UserEvalId")
                         .HasColumnType("int");
+
+                    b.Property<string>("ValidatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("HistoryUserIndicatorFOId");
 
@@ -515,6 +544,9 @@ namespace EvaluationService.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TemplatePriorityId"));
 
+                    b.Property<bool>("IsActif")
+                        .HasColumnType("bit");
+
                     b.Property<int>("MaxObjectives")
                         .HasColumnType("int");
 
@@ -579,6 +611,30 @@ namespace EvaluationService.Migrations
                     b.HasIndex("EvalId");
 
                     b.ToTable("UserEvaluations");
+                });
+
+            modelBuilder.Entity("EvaluationService.Models.UserEvaluationWeight", b =>
+                {
+                    b.Property<int>("WeightId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("WeightId"));
+
+                    b.Property<decimal>("CompetenceWeightTotal")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("IndicatorWeightTotal")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("TemplateId")
+                        .HasColumnType("int");
+
+                    b.HasKey("WeightId");
+
+                    b.HasIndex("TemplateId");
+
+                    b.ToTable("UserEvaluationWeights");
                 });
 
             modelBuilder.Entity("EvaluationService.Models.UserHelpContent", b =>
@@ -671,6 +727,13 @@ namespace EvaluationService.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ObjectiveId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -908,6 +971,17 @@ namespace EvaluationService.Migrations
                         .IsRequired();
 
                     b.Navigation("Evaluation");
+                });
+
+            modelBuilder.Entity("EvaluationService.Models.UserEvaluationWeight", b =>
+                {
+                    b.HasOne("EvaluationService.Models.FormTemplate", "FormTemplate")
+                        .WithMany()
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FormTemplate");
                 });
 
             modelBuilder.Entity("EvaluationService.Models.UserHelpContent", b =>

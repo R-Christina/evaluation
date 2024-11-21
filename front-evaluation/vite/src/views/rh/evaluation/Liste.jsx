@@ -76,7 +76,7 @@ const Liste = ({ isDataUpdated }) => {
       );
     } finally {
       setLoading(false);
-    }
+    } 
   };
 
   useEffect(() => {
@@ -90,7 +90,10 @@ const Liste = ({ isDataUpdated }) => {
 
   const indexOfLastEvaluation = (currentPage + 1) * evaluationsPerPage;
   const indexOfFirstEvaluation = indexOfLastEvaluation - evaluationsPerPage;
-  const currentEvaluations = evaluations.slice(indexOfFirstEvaluation, indexOfLastEvaluation);
+  const currentEvaluations = Array.isArray(evaluations)
+    ? evaluations.slice(indexOfFirstEvaluation, indexOfLastEvaluation)
+    : [];
+
 
   const formatDate = (dateString) => {
     const options = { day: '2-digit', month: 'long', year: 'numeric' };

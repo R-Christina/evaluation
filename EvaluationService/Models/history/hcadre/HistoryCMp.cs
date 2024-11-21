@@ -26,6 +26,9 @@ namespace EvaluationService.Models
 
         [Required]
         public decimal Result { get; set; } = 0;
+        
+        [Required]
+        public string ValidatedBy {get; set;}
 
         [Required]
         public DateTime UpdatedAt { get; set; } = DateTime.Now;
