@@ -40,6 +40,8 @@ namespace EvaluationService.Data
         public DbSet<HistoryUserCompetenceMP> HistoryUserCompetenceMPs { get; set; }
         public DbSet<HistoryUserIndicatorMP> HistoryUserIndicatorMPs { get; set; }
         public DbSet<UserEvaluationWeight> UserEvaluationWeights { get; set; }
+        public DbSet<HistoryUserHelpContent> HistoryUserHelpContents { get; set; }
+
 
 
 

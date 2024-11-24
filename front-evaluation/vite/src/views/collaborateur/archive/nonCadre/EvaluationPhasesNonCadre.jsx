@@ -54,6 +54,10 @@ function EvaluationPhasesNonCadre() {
   const departement = user.department;
   const superiorName = user.superiorName;
 
+  const [helpContents, setHelpContents] = useState([]);
+
+  const phases = ['Fixation Objectif', 'Mi-Parcours', 'Finale'];
+
   const groupedIndicators =
     historyByPhase?.indicators?.reduce((acc, indicator) => {
       if (!acc[indicator.name]) {
@@ -62,6 +66,17 @@ function EvaluationPhasesNonCadre() {
       acc[indicator.name].push(indicator);
       return acc;
     }, {}) || {};
+
+  const fetchHelpContents = async () => {
+    try {
+      const response = await formulaireInstance.get(`/Archive/GetHistoryUserHelpContents`, {
+        params: { userId: userId, evaluationId: evalId }
+      });
+      setHelpContents(response.data);
+    } catch (err) {
+      setError(err.response?.data?.Message || 'Erreur lors de la récupération des contenus d\'aide.');
+    }
+  };
 
   useEffect(() => {
     const fetchTemplate = async () => {
@@ -82,8 +97,9 @@ function EvaluationPhasesNonCadre() {
 
   useEffect(() => {
     // Charger la phase "Fixation" par défaut
-    handlePhaseClick('Fixation');
+    handlePhaseClick('Fixation Objectif');
     fetchEvaluationDetails();
+    fetchHelpContents();
   }, []);
 
   const fetchEvaluationDetails = async () => {
@@ -134,7 +150,7 @@ function EvaluationPhasesNonCadre() {
     <Paper>
       <MainCard>
         <Grid container spacing={3}>
-          {['Fixation', 'Mi-Parcours'].map((phase) => (
+        {phases.map((phase) => (
             <Grid item xs={12} sm={6} md={4} key={phase}>
               <Card
                 sx={{
@@ -321,6 +337,32 @@ function EvaluationPhasesNonCadre() {
             </TableBody>
           </Table>
         </TableContainer>
+
+        {activePhase === 'Finale' && helpContents.length > 0 && (
+          <MainCard sx={{ mt: 3, p: 2, backgroundColor: '#E8F5E9' }}>
+            <Typography variant="h5" sx={{ color: '#2E7D32', mb: 2 }}>
+              Contenus d'Aides Archivés
+            </Typography>
+            <Box sx={{ display: 'grid', gap: 2 }}>
+              {helpContents.map((help) => (
+                <Box key={help.ContentId} sx={{ border: '1px solid #C8E6C9', borderRadius: 2, p: 2 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#2E7D32', mb: 1 }}>
+                    {help.helpName}
+                  </Typography>
+                  <Typography variant="body2">{help.content || 'Aucun contenu disponible.'}</Typography>
+                  <Typography variant="caption" sx={{ color: '#757575' }}>
+                    Écrit par : {help.writerUserName}, le{' '}
+                    {new Date(help.archivedAt).toLocaleDateString('fr-FR', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          </MainCard>
+        )}
 
         <Grid container sx={{ mt: 4, justifyContent: 'space-between' }}>
           <Grid item xs={12}>

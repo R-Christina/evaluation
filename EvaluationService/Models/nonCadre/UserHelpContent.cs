@@ -15,7 +15,7 @@ namespace EvaluationService.Models
         public int HelpId { get; set; }
 
         [Required]
-        public int UserId { get; set; }
+        public string WriterUserId { get; set; }
 
         public string Content { get; set; }
 

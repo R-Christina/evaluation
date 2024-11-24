@@ -41,6 +41,12 @@ const FormulaireNonCadre = Loadable(lazy(() => import('views/rh/formulaire/nonCa
 // collab
 const Remplissage = Loadable(lazy(() => import('views/collaborateur/evaluation/cadre/Remplissage')));
 const RemplissageNonCadre = Loadable(lazy(() => import('views/collaborateur/evaluation/nonCadre/Remplissage')));
+//archive
+const AllEvaluationCadre = Loadable(lazy(() => import('views/collaborateur/archive/allEvaluation/cadre/AllCadre')));
+const AllEvaluationNonCadre = Loadable(lazy(() => import('views/collaborateur/archive/allEvaluation/nonCadre/AllNonCadre')));
+const AllCadreYear = Loadable(lazy(() => import('views/collaborateur/archive/allEvaluation/cadre/AllCadreYear')));
+const AllNonCadreYear = Loadable(lazy(() => import('views/collaborateur/archive/allEvaluation/nonCadre/AllNonCadreYear')));
+
 const MyEvaluation = Loadable(lazy(() => import('views/collaborateur/archive/MyEvaluation')));
 const EvaluationPhasesCadre = Loadable(lazy(() => import('views/collaborateur/archive/cadre/EvaluationPhasesCadre')));
 const EvaluationPhasesNonCadre = Loadable(lazy(() => import('views/collaborateur/archive/nonCadre/EvaluationPhasesNonCadre')));
@@ -296,6 +302,42 @@ const MainRoutes = {
     },
 
     //archive
+    {
+      path: 'allEvaluation',
+      children: [
+        {
+          path: 'cadre',
+          element: <AllEvaluationCadre />
+        }
+      ]
+    },
+    {
+      path: 'allEvaluation',
+      children: [
+        {
+          path: 'nonCadre',
+          element: <AllEvaluationNonCadre />
+        }
+      ]
+    },
+    {
+      path: 'allEvaluation',
+      children: [
+        {
+          path: 'cadreYear/:userId/:typeUser',
+          element: <AllCadreYear />
+        }
+      ]
+    },
+    {
+      path: 'allEvaluation',
+      children: [
+        {
+          path: 'nonCadreYear/:userId/:typeUser',
+          element: <AllNonCadreYear />
+        }
+      ]
+    },
     {
       path: 'archive',
       children: [

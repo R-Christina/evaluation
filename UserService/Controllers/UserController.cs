@@ -607,6 +607,51 @@ namespace UserService.Controllers
             }
         }
 
+        [HttpGet("user/{id}")]
+        public async Task<ActionResult<UserDTO>> GetUserById(string id)
+        {
+            try
+            {
+                // Rechercher l'utilisateur par son ID
+                var user = await _context.Users
+                    .Where(u => u.Id == id)
+                    .Select(u => new UserDTO
+                    {
+                        Id = u.Id,
+                        Name = u.Name ?? "",
+                        Email = u.Email ?? "",
+                        Department = u.Department != null 
+                            ? u.Department == "Direction des Systèmes d'Information" 
+                                ? "DSI" 
+                                : u.Department 
+                            : "",
+                        Poste = u.Poste ?? "",
+                        SuperiorId = u.SuperiorId ?? "",
+                        SuperiorName = u.SuperiorName ?? "",
+                        Status = u.Status ?? "",
+                        Habilitations = u.Habilitations.Select(h => new HabilitationIDLabelDto
+                        {
+                            Id = h.Id,
+                            Label = h.Label ?? ""
+                        }).ToList()
+                    })
+                    .FirstOrDefaultAsync();
+
+                // Vérifier si l'utilisateur existe
+                if (user == null)
+                {
+                    return NotFound(new { Message = "Utilisateur non trouvé" });
+                }
+
+                return Ok(user);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
+
         // Fonction pour obtenir tous les utilisateurs dont TypeUser est null
         [HttpGet("users-with-null-type")]
         public async Task<ActionResult<IEnumerable<User>>> GetUsersWithNullType()

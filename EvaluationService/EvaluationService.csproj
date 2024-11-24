@@ -18,10 +18,7 @@
   </ItemGroup>
 
 <ItemGroup>
-  <Reference Include="CommonModels">
-    <HintPath>..\CommonModels\bin\Debug\net8.0\CommonModels.dll</HintPath>
-  </Reference>
+  <ProjectReference Include="..\CommonModels\CommonModels.csproj" />
 </ItemGroup>
-
 
 </Project>

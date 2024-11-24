@@ -373,6 +373,74 @@ namespace EvaluationService.Controllers
             }
         }
 
+        [HttpGet("getUserObjectivesHistory")]
+        public async Task<IActionResult> GetUserObjectivesHistory(string userId, string type)
+        {
+            // Validation des paramètres
+            if (string.IsNullOrEmpty(userId))
+            {
+                return BadRequest(new { Message = "L'identifiant de l'utilisateur est requis." });
+            }
+
+            if (string.IsNullOrEmpty(type))
+            {
+                return BadRequest(new { Message = "Le type d'évaluation est requis." });
+            }
+
+            // Conversion du type d'évaluation
+            if (!Enum.TryParse<FormType>(type, true, out var formType))
+            {
+                return BadRequest(new { Message = "Type d'évaluation invalide. Utilisez 'Cadre' ou 'NonCadre'." });
+            }
+
+            // Récupération de l'ID de l'évaluation en cours pour le type spécifié
+            var evaluationId = await _context.Evaluations
+                .Where(e => e.EtatId == 2 && e.FormTemplate.Type == formType)
+                .Select(e => e.EvalId)
+                .FirstOrDefaultAsync();
+
+            if (evaluationId == 0)
+            {
+                return NotFound(new { Message = $"Aucune évaluation en cours pour le type {type}." });
+            }
+
+            // Récupération de l'ID de l'évaluation utilisateur
+            var userEvalId = await GetUserEvalIdAsync(evaluationId, userId);
+            if (userEvalId == null)
+            {
+                return NotFound(new { Message = "Évaluation utilisateur non trouvée." });
+            }
+
+            // Récupération des entrées de l'historique
+            var historyEntries = await _context.HistoryCFos
+                .Where(h => h.UserEvalId == userEvalId.Value)
+                .OrderByDescending(h => h.CreatedAt)
+                .ToListAsync();
+
+            // Vérification des résultats
+            if (historyEntries.Count == 0)
+            {
+                return NotFound(new { Message = $"Aucun historique trouvé pour l'utilisateur {userId} et le type {type}." });
+            }
+
+            // Retour des données
+            return Ok(new
+            {
+                Message = "Historique récupéré avec succès.",
+                HistoryCFos = historyEntries.Select(h => new
+                {
+                    h.HcfId,
+                    h.UserEvalId,
+                    h.PriorityName,
+                    h.Description,
+                    h.Weighting,
+                    h.ValidatedBy,
+                    h.CreatedAt
+                }).ToList()
+            });
+        }
+
+
         [HttpPost("validateMitermObjectif")]
         public async Task<IActionResult> ValidateMitermObjectif(
             string validatorUserId,
@@ -429,33 +497,33 @@ namespace EvaluationService.Controllers
 
                     // Update or insert ObjectiveColumnValues
                     foreach (var modifiedColumn in modifiedObjective.ObjectiveColumnValues ?? new List<ColumnValueDto>())
-        {
-            var columnToUpdate = userObjective.ObjectiveColumnValues
-                .FirstOrDefault(c => c.ObjectiveColumn != null && c.ObjectiveColumn.Name == modifiedColumn.ColumnName);
+                    {
+                        var columnToUpdate = userObjective.ObjectiveColumnValues
+                            .FirstOrDefault(c => c.ObjectiveColumn != null && c.ObjectiveColumn.Name == modifiedColumn.ColumnName);
 
 
-            if (columnToUpdate != null)
-            {
-                // Update the existing column value
-                columnToUpdate.Value = modifiedColumn.Value;
-                _context.ObjectiveColumnValues.Update(columnToUpdate);
-            }
-            else
-            {
-                // Check if the column exists in the database
-                var column = await _context.ObjectiveColumns
-                    .FirstOrDefaultAsync(c => c.Name == modifiedColumn.ColumnName);
+                        if (columnToUpdate != null)
+                        {
+                            // Update the existing column value
+                            columnToUpdate.Value = modifiedColumn.Value;
+                            _context.ObjectiveColumnValues.Update(columnToUpdate);
+                        }
+                        else
+                        {
+                            // Check if the column exists in the database
+                            var column = await _context.ObjectiveColumns
+                                .FirstOrDefaultAsync(c => c.Name == modifiedColumn.ColumnName);
 
-                if (column == null)
-                {
-                    // Throw an error if the column doesn't exist
-                    throw new InvalidOperationException($"The column '{modifiedColumn.ColumnName}' does not exist in the database.");
-                }
+                            if (column == null)
+                            {
+                                // Throw an error if the column doesn't exist
+                                throw new InvalidOperationException($"The column '{modifiedColumn.ColumnName}' does not exist in the database.");
+                            }
 
-                // If the column exists but is not linked to the current UserObjective, return an error
-                return BadRequest(new { Message = $"The column '{modifiedColumn.ColumnName}' is not linked to the current UserObjective." });
-            }
-        }
+                            // If the column exists but is not linked to the current UserObjective, return an error
+                            return BadRequest(new { Message = $"The column '{modifiedColumn.ColumnName}' is not linked to the current UserObjective." });
+                        }
+                    }
 
                 }
 
@@ -549,16 +617,21 @@ namespace EvaluationService.Controllers
             }
         }
 
-
-
-
-        //-----------------------------NonCadre---------------------------------------------------------------------------------------------------
-
-
-        [HttpGet("IndicatorValidateByUser")]
-        public async Task<IActionResult> GetUserIndicatorsAsync(string userId, string type)
+        [HttpGet("getHistoryMidtermeByUser")]
+        public async Task<IActionResult> GetHistoryCMps(string userId, string type)
         {
-            // Vérification du type et conversion en Enum
+            // Vérification des paramètres
+            if (string.IsNullOrEmpty(userId))
+            {
+                return BadRequest(new { Message = "L'identifiant de l'utilisateur est requis." });
+            }
+
+            if (string.IsNullOrEmpty(type))
+            {
+                return BadRequest(new { Message = "Le type d'évaluation est requis." });
+            }
+
+            // Conversion du type d'évaluation
             if (!Enum.TryParse<FormType>(type, true, out var formType))
             {
                 return BadRequest(new { Message = "Type d'évaluation invalide. Utilisez 'Cadre' ou 'NonCadre'." });
@@ -582,8 +655,58 @@ namespace EvaluationService.Controllers
                 return NotFound(new { Message = "Évaluation utilisateur non trouvée." });
             }
 
+            // Récupération des données de l'historique
+            var history = await _context.HistoryCMps
+                .Where(h => h.UserEvalId == userEvalId)
+                .ToListAsync();
+
+            if (history == null || !history.Any())
+            {
+                return NotFound(new { Message = "Aucun historique trouvé pour cet utilisateur." });
+            }
+
+            return Ok(history);
+        }
+
+
+
+
+
+        //-----------------------------NonCadre---------------------------------------------------------------------------------------------------
+
+
+        [HttpGet("IndicatorValidateByUser")]
+        public async Task<IActionResult> GetUserIndicatorsAsync(string userId, string type)
+        {
+            if (!Enum.TryParse<FormType>(type, true, out var formType))
+            {
+                return BadRequest(new { Message = "Type d'évaluation invalide. Utilisez 'Cadre' ou 'NonCadre'." });
+            }
+
+            // Récupération de l'ID de l'évaluation en cours pour le type spécifié
+            var evaluationId = await _context.Evaluations
+                .Where(e => e.EtatId == 2 && e.FormTemplate.Type == formType)
+                .Select(e => e.EvalId)
+                .FirstOrDefaultAsync();
+
+            System.Console.WriteLine(evaluationId);
+
+
+            if (evaluationId == 0)
+            {
+                return NotFound(new { Message = $"Aucune évaluation en cours pour le type {type}." });
+            }
+
+            // Récupération de l'ID de l'évaluation utilisateur
+            var userEvalId = await GetUserEvalIdAsync(evaluationId, userId);
+            if (userEvalId == null)
+            {
+                return NotFound(new { Message = "Évaluation utilisateur non trouvée." });
+            }
+            System.Console.WriteLine("userEvalId" + userEvalId);
+
             var userIndicators = await _context.UserIndicators
-                .Where(ui => ui.UserEvalId == 2)
+                .Where(ui => ui.UserEvalId == userEvalId)
                 .Select(ui => new
                 {
                     UserIndicatorId = ui.UserIndicatorId,
@@ -605,7 +728,6 @@ namespace EvaluationService.Controllers
             // Retourne les résultats
             return Ok(userIndicators);
         }
-
 
 
         [HttpPost("ValidateIndicator")]
@@ -754,13 +876,19 @@ namespace EvaluationService.Controllers
 
             var competences = await _context.UserCompetences
                 .Where(c => c.UserEvalId == userEvalId)
-                .Select(c => new UserCompetenceDto
-                {
-                    UserCompetenceId = c.UserCompetenceId,
-                    UserEvalId = c.UserEvalId,
-                    CompetenceId = c.CompetenceId,
-                    Performance = c.Performance
-                })
+                .Join(
+                    _context.Competences, // Jointure avec la table Competences
+                    userCompetence => userCompetence.CompetenceId,
+                    competence => competence.CompetenceId,
+                    (userCompetence, competence) => new UserCompetenceDto
+                    {
+                        UserCompetenceId = userCompetence.UserCompetenceId,
+                        UserEvalId = userCompetence.UserEvalId,
+                        CompetenceId = userCompetence.CompetenceId,
+                        Performance = userCompetence.Performance,
+                        CompetenceName = competence.Name // Ajout du nom de la compétence
+                    }
+                )
                 .ToListAsync();
 
             if (competences == null || competences.Count == 0)
@@ -805,7 +933,7 @@ namespace EvaluationService.Controllers
 
             return Ok(indicators);
         }
-        
+
         [HttpPost("ValidateResultManager")]
         public async Task<IActionResult> ValidateResultManager(string userId, string type, [FromBody] MiParcoursDataDto miParcoursData)
         {
@@ -896,6 +1024,55 @@ namespace EvaluationService.Controllers
                 return BadRequest($"An error occurred: {ex.Message}");
             }
         }
+
+        [HttpGet("IsResultValidateByManager")]
+        public async Task<IActionResult> VerifyEvaluationDataAsync(string userId, string type)
+        {
+            // Vérifie si le type fourni correspond à une énumération valide
+            if (!Enum.TryParse<FormType>(type, true, out var formType))
+            {
+                return BadRequest(new { Message = "Type d'évaluation invalide. Utilisez 'Cadre' ou 'NonCadre'." });
+            }
+
+            // Récupère l'ID de l'évaluation en cours pour le type spécifié
+            var evaluationId = await _context.Evaluations
+                .Where(e => e.EtatId == 2 && e.FormTemplate.Type == formType)
+                .Select(e => e.EvalId)
+                .FirstOrDefaultAsync();
+
+            if (evaluationId == 0)
+            {
+                return NotFound(new { Message = $"Aucune évaluation en cours pour le type {type}." });
+            }
+
+            // Récupère l'ID de l'évaluation utilisateur
+            var userEvalId = await GetUserEvalIdAsync(evaluationId, userId);
+            if (userEvalId == null)
+            {
+                return NotFound(new { Message = "Évaluation utilisateur non trouvée." });
+            }
+
+            var competences = await _context.UserCompetences
+                .Where(uc => uc.UserEvalId == userEvalId)
+                .ToListAsync();
+
+            var indicatorResults = await _context.UserIndicatorResults
+                .Join(_context.UserIndicators,
+                    uir => uir.UserIndicatorId,
+                    ui => ui.UserIndicatorId,
+                    (uir, ui) => new { uir, ui })
+                .Where(joined => joined.ui.UserEvalId == userEvalId)
+                .Select(joined => joined.uir)
+                .ToListAsync();
+
+            // Retourne les données trouvées ou null si aucune donnée n'est disponible
+            return Ok(new
+            {
+                Competences = competences.Any() ? competences : null,
+                IndicatorResults = indicatorResults.Any() ? indicatorResults : null
+            });
+        }
+
 
         [HttpPost("ArchiveMiParcoursData")]
         public async Task<IActionResult> ArchiveMiParcoursData(string userId, string type)
@@ -992,6 +1169,191 @@ namespace EvaluationService.Controllers
             }
         }
 
+        [HttpGet("IsResultValidateByUser")]
+
+        public async Task<IActionResult> IsResultValidateByUser(string userId, string type)
+        {
+            // 1. Validate the type parameter
+            if (!Enum.TryParse<FormType>(type, true, out var formType))
+            {
+                return BadRequest(new { Message = "Type d'évaluation invalide. Utilisez 'Cadre' ou 'NonCadre'." });
+            }
+
+            // 2. Retrieve the current evaluation ID based on type and EtatId
+            var evaluationId = await _context.Evaluations
+                .Where(e => e.EtatId == 2 && e.FormTemplate.Type == formType)
+                .Select(e => e.EvalId)
+                .FirstOrDefaultAsync();
+
+            if (evaluationId == 0)
+            {
+                return NotFound(new { Message = $"Aucune évaluation en cours pour le type {type}." });
+            }
+
+            // 3. Retrieve the user evaluation ID for the given user and evaluation
+            var userEvalId = await GetUserEvalIdAsync(evaluationId, userId);
+            if (userEvalId == null)
+            {
+                return NotFound(new { Message = "Évaluation utilisateur non trouvée." });
+            }
+
+            // 4. Fetch data from HistoryUserCompetenceMPs
+            var competences = await _context.HistoryUserCompetenceMPs
+                .Where(c => c.UserEvalId == userEvalId)
+                .ToListAsync();
+
+            // 5. Fetch data from HistoryUserIndicatorMPs
+            var indicators = await _context.HistoryUserIndicatorMPs
+                .Where(i => i.UserEvalId == userEvalId)
+                .ToListAsync();
+
+            // 6. Return the combined result
+            return Ok(new
+            {
+                UserEvalId = userEvalId,
+                Competences = competences,
+                Indicators = indicators
+            });
+        }
+
+        [HttpPost("InsertHelpContentsAndArchive")]
+        public async Task<IActionResult> InsertHelpContentsAndArchive([FromBody] List<UserHelpContentRequest> helpContents)
+        {
+            if (helpContents == null || !helpContents.Any())
+            {
+                return BadRequest(new { Message = "Aucun contenu à traiter." });
+            }
+
+            try
+            {
+                foreach (var helpContentRequest in helpContents)
+                {
+                    // 1. Valider le type d'évaluation
+                    if (!Enum.TryParse<FormType>(helpContentRequest.Type, true, out var formType))
+                    {
+                        return BadRequest(new { Message = $"Type d'évaluation invalide pour l'élément {helpContentRequest.HelpId}. Utilisez 'Cadre' ou 'NonCadre'." });
+                    }
+
+                    // 2. Récupérer l'évaluation actuelle basée sur le type et l'état
+                    var evaluationId = await _context.Evaluations
+                        .Where(e => e.EtatId == 2 && e.FormTemplate.Type == formType)
+                        .Select(e => e.EvalId)
+                        .FirstOrDefaultAsync();
+
+                    if (evaluationId == 0)
+                    {
+                        return NotFound(new { Message = $"Aucune évaluation en cours pour le type {helpContentRequest.Type}." });
+                    }
+
+                    // 3. Récupérer le UserEvalId pour le userId et l'évaluation
+                    var userEvalId = await GetUserEvalIdAsync(evaluationId, helpContentRequest.UserId);
+                    if (userEvalId == null)
+                    {
+                        return NotFound(new { Message = $"Évaluation utilisateur non trouvée pour l'utilisateur {helpContentRequest.UserId}." });
+                    }
+
+                    // 4. Récupérer le contenu existant ou le créer si inexistant
+                    var userHelpContent = await _context.UserHelpContents
+                        .FirstOrDefaultAsync(uhc => uhc.UserEvalId == userEvalId.Value && uhc.HelpId == helpContentRequest.HelpId);
+
+                    if (userHelpContent == null)
+                    {
+                        // Créer un nouveau contenu d'aide
+                        userHelpContent = new UserHelpContent
+                        {
+                            UserEvalId = userEvalId.Value,
+                            HelpId = helpContentRequest.HelpId,
+                            WriterUserId = helpContentRequest.WriterUserId,
+                            Content = helpContentRequest.Content
+                        };
+                        _context.UserHelpContents.Add(userHelpContent);
+                    }
+                    else
+                    {
+                        // Mettre à jour le contenu existant
+                        userHelpContent.WriterUserId = helpContentRequest.WriterUserId;
+                        userHelpContent.Content = helpContentRequest.Content;
+                    }
+
+                    // 5. Toujours archiver le contenu dans l'historique
+                    var historyContent = new HistoryUserHelpContent
+                    {
+                        ContentId = userHelpContent.ContentId, // Toujours lié au UserHelpContent
+                        HelpId = helpContentRequest.HelpId,
+                        HelpName = _context.Helps.FirstOrDefault(h => h.HelpId == helpContentRequest.HelpId)?.Name ?? "N/A",
+                        UserEvalId = userHelpContent.UserEvalId,
+                        WriterUserId = helpContentRequest.WriterUserId,
+                        Content = helpContentRequest.Content,
+                        ArchivedAt = DateTime.UtcNow
+                    };
+                    _context.HistoryUserHelpContents.Add(historyContent);
+                }
+
+                // Sauvegarder les modifications dans la base de données
+                await _context.SaveChangesAsync();
+
+                return Ok("Contenus ajoutés ou mis à jour et archivés avec succès.");
+            }
+            catch (Exception ex)
+            {
+                // Gestion des erreurs
+                Console.Error.WriteLine($"Erreur lors de l'insertion ou de l'archivage des contenus : {ex.Message}");
+                return BadRequest(new { Message = $"Une erreur est survenue : {ex.Message}" });
+            }
+        }
+
+        [HttpGet("CheckWriterValidation")]
+        public async Task<IActionResult> CheckWriterValidation(int evalId, string userId, int helpId, string writerUserId)
+        {
+            try
+            {
+                // Récupérer le UserEvalId à partir de l'évaluation et de l'utilisateur
+                var userEvalId = await GetUserEvalIdAsync(evalId, userId);
+                if (userEvalId == null)
+                {
+                    return NotFound(new { Message = $"Aucune évaluation utilisateur trouvée pour l'utilisateur {userId} et l'évaluation {evalId}." });
+                }
+
+                // Vérifier si le HelpId est actif pour cette évaluation
+                var isHelpActiveForEval = await _context.Helps
+                    .Where(h => h.HelpId == helpId) // Vérifier le HelpId donné
+                    .Join(
+                        _context.Evaluations,
+                        help => help.TemplateId,       // Clé étrangère TemplateId dans Helps
+                        eval => eval.TemplateId,      // Clé TemplateId dans Evaluations
+                        (help, eval) => new { help, eval } // Associer Helps et Evaluations
+                    )
+                    .AnyAsync(he => he.eval.EvalId == evalId && he.help.IsActive);
+
+                if (!isHelpActiveForEval)
+                {
+                    return NotFound(new { Message = $"Le contenu HelpId {helpId} n'est pas actif pour l'évaluation {evalId}." });
+                }
+
+                // Vérifier si le WriterUserId a validé ce contenu
+                var isValidated = await _context.UserHelpContents
+                    .AnyAsync(uhc => uhc.UserEvalId == userEvalId.Value
+                                    && uhc.HelpId == helpId
+                                    && uhc.WriterUserId == writerUserId);
+
+                // Retourner le résultat
+                if (isValidated)
+                {
+                    return Ok(new { Message = $"L'utilisateur WriterUserId {writerUserId} a déjà validé ce contenu.", IsValidated = true });
+                }
+                else
+                {
+                    return Ok(new { Message = $"L'utilisateur WriterUserId {writerUserId} n'a pas encore validé ce contenu.", IsValidated = false });
+                }
+            }
+            catch (Exception ex)
+            {
+                // Gestion des erreurs
+                Console.Error.WriteLine($"Erreur lors de la vérification de validation : {ex.Message}");
+                return BadRequest(new { Message = $"Une erreur est survenue : {ex.Message}" });
+            }
+        }
+
     }
 
     public class MiParcoursDataDto
@@ -1025,9 +1387,17 @@ namespace EvaluationService.Controllers
         public string indicatorName { get; set; }
         public string? Description { get; set; }
         public decimal? Weighting { get; set; }
-        public string? ResultIndicator {get; set;}
-        public decimal? Result {get;set;}
+        public string? ResultIndicator { get; set; }
+        public decimal? Result { get; set; }
         public List<ColumnValueDto>? ObjectiveColumnValues { get; set; }
     }
 
+    public class UserHelpContentRequest
+    {
+        public string UserId { get; set; }
+        public string WriterUserId { get; set; }
+        public string Type { get; set; } // "Cadre" ou "NonCadre"
+        public int HelpId { get; set; }
+        public string Content { get; set; }
+    }
 }

@@ -19,11 +19,10 @@
     <PackageReference Include="System.DirectoryServices.AccountManagement" Version="8.0.1" />
   </ItemGroup>
 
- <ItemGroup>
-  <Reference Include="CommonModels">
-    <HintPath>..\CommonModels\bin\Debug\net8.0\CommonModels.dll</HintPath>
-  </Reference>
+<ItemGroup>
+  <ProjectReference Include="..\CommonModels\CommonModels.csproj" />
 </ItemGroup>
+
 
 
 </Project>

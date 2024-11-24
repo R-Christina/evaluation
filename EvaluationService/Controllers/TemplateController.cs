@@ -327,6 +327,7 @@ namespace EvaluationService.Controllers
         {
             try
             {
+                // Récupération du modèle principal
                 var template = await _context.FormTemplates
                     .Where(t => t.TemplateId == templateId && t.Type == FormType.NonCadre)
                     .Include(t => t.Competences)
@@ -338,19 +339,30 @@ namespace EvaluationService.Controllers
                     return NotFound("Le modèle de type NonCadre avec cet ID n'existe pas.");
                 }
 
+                // Récupération des pondérations d'évaluation de l'utilisateur
                 var userEvaluationWeights = await _context.UserEvaluationWeights
                     .FirstOrDefaultAsync(w => w.TemplateId == templateId);
 
-                var helps = await _context.Helps.ToListAsync();
+                // Récupération des "Helps" actifs uniquement
+                var helps = await _context.Helps
+                    .Where(h => h.TemplateId == templateId && h.IsActive)
+                    .Select(h => new
+                    {
+                        h.HelpId,
+                        h.Name
+                    })
+                    .ToListAsync();
 
+                // Récupération des niveaux
                 var levels = await _context.Levels.Select(l => new
                 {
                     l.LevelId,
                     l.LevelName
                 }).ToListAsync();
 
+                // Récupération des indicateurs actifs uniquement
                 var indicators = await _context.Indicators
-                    .Where(i => i.TemplateId == templateId && i.IsActive) // Filtrer les indicateurs actifs
+                    .Where(i => i.TemplateId == templateId && i.IsActive)
                     .Select(i => new
                     {
                         i.IndicatorId,
@@ -358,6 +370,7 @@ namespace EvaluationService.Controllers
                         i.label
                     }).ToListAsync();
 
+                // Construction du résultat
                 var result = new
                 {
                     TemplateId = template.TemplateId,
@@ -375,11 +388,7 @@ namespace EvaluationService.Controllers
                             cl.Description
                         })
                     }),
-                    Helps = helps.Select(h => new
-                    {
-                        h.HelpId,
-                        h.Name
-                    }),
+                    Helps = helps,
                     Levels = levels,
                     Indicators = indicators
                 };
@@ -606,6 +615,124 @@ namespace EvaluationService.Controllers
             }
         }
 
+        [HttpPost("AddHelp")]
+        public async Task<IActionResult> AddHelp([FromBody] HelpDto helpDto)
+        {
+            if (helpDto == null || string.IsNullOrEmpty(helpDto.Name))
+            {
+                return BadRequest(new { Message = "Les informations du Help sont invalides." });
+            }
+
+            try
+            {
+                var help = new Help
+                {
+                    Name = helpDto.Name,
+                    TemplateId = helpDto.TemplateId,
+                    AllowedUserLevel = helpDto.AllowedUserLevel,
+                    IsActive = true
+                };
+
+                _context.Helps.Add(help);
+                await _context.SaveChangesAsync();
+
+                return Ok(help);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Erreur lors de l'ajout du Help: {ex.Message}");
+                return BadRequest(new { Message = $"Une erreur est survenue: {ex.Message}" });
+            }
+        }
+
+        [HttpGet("GetHelps")]
+        public async Task<IActionResult> GetHelps([FromQuery] bool? onlyActive = null)
+        {
+            try
+            {
+                // Construire la requête de base
+                var helpsQuery = _context.Helps.AsQueryable();
+
+                // Filtrer par état si spécifié
+                if (onlyActive.HasValue)
+                {
+                    helpsQuery = helpsQuery.Where(h => h.IsActive == onlyActive.Value);
+                }
+
+                // Exécuter la requête
+                var helps = await helpsQuery
+                    .Select(h => new
+                    {
+                        h.HelpId,
+                        h.Name,
+                        h.TemplateId,
+                        h.IsActive,
+                        h.AllowedUserLevel
+                    })
+                    .ToListAsync();
+
+                return Ok(helps);
+            }
+            catch (Exception ex)
+            {
+                // Gérer les erreurs
+                Console.Error.WriteLine($"Erreur lors de la récupération des aides : {ex.Message}");
+                return StatusCode(500, new { Message = "Une erreur est survenue lors de la récupération des aides." });
+            }
+        }
+
+
+        [HttpPut("UpdateHelps")]
+        public async Task<IActionResult> UpdateHelps([FromBody] List<UpdateHelpRequest> requests)
+        {
+            if (requests == null || !requests.Any())
+            {
+                return BadRequest(new { Message = "Aucune aide à mettre à jour." });
+            }
+
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                foreach (var req in requests)
+                {
+                    var help = await _context.Helps.FindAsync(req.HelpId);
+                    if (help == null)
+                    {
+                        return NotFound(new { Message = $"Aide avec ID {req.HelpId} non trouvée." });
+                    }
+
+                    // Mise à jour des propriétés si elles sont fournies
+                    if (!string.IsNullOrEmpty(req.Name))
+                    {
+                        help.Name = req.Name;
+                    }
+
+                    if (req.AllowedUserLevel.HasValue)
+                    {
+                        help.AllowedUserLevel = req.AllowedUserLevel.Value;
+                    }
+
+                    if (req.IsActive.HasValue)
+                    {
+                        help.IsActive = req.IsActive.Value;
+                    }
+
+                    _context.Helps.Update(help);
+                }
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return Ok(new { Message = "Toutes les aides ont été mises à jour avec succès." });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return StatusCode(500, new { Message = $"Erreur du serveur : {ex.Message}" });
+            }
+        }
+
+
 
         [HttpGet("GetAllTemplates")]
         public async Task<ActionResult<IEnumerable<FormTemplateDto>>> GetAllTemplates()
@@ -670,10 +797,24 @@ namespace EvaluationService.Controllers
 
     public class UpdateWeightRequest
     {
-        [Required]
         public int TemplateId { get; set; }
         public int CompetenceWeightTotal { get; set; }
         public int IndicatorWeightTotal { get; set; }
+    }
+
+    public class HelpDto
+    {
+        public string Name { get; set; }
+        public int TemplateId { get; set; }
+        public int AllowedUserLevel { get; set; } // 0: Collaborateur, 1: N+1, 2: N+2
+    }
+
+    public class UpdateHelpRequest
+    {
+        public int HelpId { get; set; } // Obligatoire pour identifier le Help
+        public string Name { get; set; } // Optionnel
+        public int? AllowedUserLevel { get; set; } // Optionnel
+        public bool? IsActive { get; set; } // Optionnel
     }
 
 }

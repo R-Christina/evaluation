@@ -387,7 +387,7 @@ const Formulaire = () => {
         <Grid container alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
           <Grid item>
             <Typography variant="subtitle2">Formulaire Cadre</Typography>
-            <Typography variant="h3"sx={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
+            <Typography variant="h3"sx={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer', marginTop: '0.5rem' }}>
               Formulaire d’évaluation
             </Typography>
           </Grid>

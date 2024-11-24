@@ -1,7 +1,9 @@
+using CommonModels.DTOs;
 using EvaluationService.Data;
 using EvaluationService.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+// using CommonModels.DTOs;
 
 namespace EvaluationService.Controllers
 {
@@ -11,11 +13,13 @@ namespace EvaluationService.Controllers
     {
         private readonly AppdbContext _context;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IConfiguration _configuration;
 
-        public ArchiveController(AppdbContext context, IHttpClientFactory httpClientFactory)
+        public ArchiveController(AppdbContext context, IHttpClientFactory httpClientFactory, IConfiguration configuration)
         {
             _context = context;
             _httpClientFactory = httpClientFactory;
+            _configuration = configuration;
         }
 
         [HttpGet("years/{userId}/{type}")]
@@ -39,81 +43,6 @@ namespace EvaluationService.Controllers
             return Ok(evaluations);
         }
 
-
-        // [HttpGet("historyCadre/{userId}/{evalId}/{phase}")]
-        // public IActionResult GetEvaluationHistoryByPhase(string userId, int evalId, string phase)
-        // {
-        //     if (phase == "Fixation")
-        //     {
-        //         var fixationHistory = _context.HistoryCFos
-        //             .Join(_context.UserEvaluations,
-        //                   hcf => hcf.UserEvalId,
-        //                   ue => ue.UserEvalId,
-        //                   (hcf, ue) => new { hcf, ue })
-        //             .Join(_context.Evaluations,
-        //                   combined => combined.ue.EvalId,
-        //                   e => e.EvalId,
-        //                   (combined, e) => new { combined.hcf, combined.ue, e })
-        //             .Where(result => result.ue.UserId == userId && result.e.EvalId == evalId && result.e.Type == "Cadre")
-        //             .Select(result => new
-        //             {
-        //                 Phase = "Fixation",
-        //                 HistoryId = result.hcf.HcfId,
-        //                 result.hcf.PriorityName,
-        //                 result.hcf.Description,
-        //                 result.hcf.Weighting,
-        //                 Date = result.hcf.CreatedAt,
-        //                 EvaluationYear = result.e.EvalAnnee,
-        //                 ResultIndicator = (string)null,
-        //                 Result = (string)null
-        //             })
-        //             .ToList();
-
-        //         if (fixationHistory == null || !fixationHistory.Any())
-        //         {
-        //             return NotFound(new { message = "No fixation history found for the specified user and evaluation." });
-        //         }
-
-        //         return Ok(fixationHistory);
-        //     }
-        //     else if (phase == "Mi-Parcours")
-        //     {
-        //         var miParcoursHistory = _context.HistoryCMps
-        //             .Join(_context.UserEvaluations,
-        //                   hcm => hcm.UserEvalId,
-        //                   ue => ue.UserEvalId,
-        //                   (hcm, ue) => new { hcm, ue })
-        //             .Join(_context.Evaluations,
-        //                   combined => combined.ue.EvalId,
-        //                   e => e.EvalId,
-        //                   (combined, e) => new { combined.hcm, combined.ue, e })
-        //             .Where(result => result.ue.UserId == userId && result.e.EvalId == evalId && result.e.Type == "Cadre")
-        //             .Select(result => new
-        //             {
-        //                 Phase = "Mi-Parcours",
-        //                 HistoryId = result.hcm.HcmId,
-        //                 result.hcm.PriorityName,
-        //                 result.hcm.Description,
-        //                 result.hcm.Weighting,
-        //                 Date = result.hcm.UpdatedAt,
-        //                 EvaluationYear = result.e.EvalAnnee,
-        //                 result.hcm.ResultIndicator,
-        //                 result.hcm.Result
-        //             })
-        //             .ToList();
-
-        //         if (miParcoursHistory == null || !miParcoursHistory.Any())
-        //         {
-        //             return NotFound(new { message = "No mi-parcours history found for the specified user and evaluation." });
-        //         }
-
-        //         return Ok(miParcoursHistory);
-        //     }
-        //     else
-        //     {
-        //         return BadRequest(new { message = "Invalid phase specified. Please specify either 'Fixation' or 'Mi-Parcours'." });
-        //     }
-        // }
 
         [HttpGet("historyCadre/{userId}/{evalId}/{phase}")]
         public IActionResult GetEvaluationHistoryByPhase(string userId, int evalId, string phase)
@@ -287,18 +216,6 @@ namespace EvaluationService.Controllers
 
         //------------------------------------------------------------------NonCadre---------------------------------------------------------------
 
-        private List<IndicatorResultSum> CalculateIndicatorSums(List<IndicatorHistory> indicatorsHistory)
-        {
-            return indicatorsHistory
-                .GroupBy(i => i.Name)
-                .Select(g => new IndicatorResultSum
-                {
-                    Name = g.Key,
-                    TotalResult = g.Sum(i => i.Result)
-                })
-                .ToList();
-        }
-
         private Evaluation GetEvaluation(int evalId)
         {
             return _context.Evaluations.FirstOrDefault(e => e.EvalId == evalId);
@@ -307,7 +224,7 @@ namespace EvaluationService.Controllers
         // Méthode privée pour récupérer l'historique des compétences
         private List<object> GetCompetencesHistory(string userId, int evalId, string phase)
         {
-            if (phase.Equals("Fixation", StringComparison.OrdinalIgnoreCase))
+            if (phase.Equals("Fixation Objectif", StringComparison.OrdinalIgnoreCase))
             {
                 return _context.HistoryUserCompetenceFOs
                     .Join(_context.UserEvaluations,
@@ -317,7 +234,7 @@ namespace EvaluationService.Controllers
                     .Where(result => result.ue.UserId == userId && result.ue.EvalId == evalId)
                     .Select(result => new
                     {
-                        Phase = "Fixation",
+                        Phase = "Fixation Objectif",
                         HistoryId = result.huc.HistoryUserCompetenceId,
                         result.huc.CompetenceName,
                         result.huc.Performance
@@ -341,16 +258,32 @@ namespace EvaluationService.Controllers
                     })
                     .ToList<object>();
             }
+            else if (phase.Equals("finale", StringComparison.OrdinalIgnoreCase))
+            {
+                return _context.HistoryUserCompetenceMPs
+                    .Join(_context.UserEvaluations,
+                        huc => huc.UserEvalId,
+                        ue => ue.UserEvalId,
+                        (huc, ue) => new { huc, ue })
+                    .Where(result => result.ue.UserId == userId && result.ue.EvalId == evalId)
+                    .Select(result => new
+                    {
+                        Phase = "finale",
+                        HistoryId = result.huc.HistoryUserCompetenceId,
+                        result.huc.CompetenceName,
+                        result.huc.Performance
+                    })
+                    .ToList<object>();
+            }
             else
             {
                 return new List<object>();
             }
         }
 
-        // Méthode privée pour récupérer l'historique des indicateurs
         private List<object> GetIndicatorsHistory(string userId, int evalId, string phase)
         {
-            if (phase.Equals("Fixation", StringComparison.OrdinalIgnoreCase))
+            if (phase.Equals("Fixation Objectif", StringComparison.OrdinalIgnoreCase))
             {
                 return _context.HistoryUserIndicatorFOs
                     .Join(_context.UserEvaluations,
@@ -360,7 +293,7 @@ namespace EvaluationService.Controllers
                     .Where(result => result.ue.UserId == userId && result.ue.EvalId == evalId)
                     .Select(result => new
                     {
-                        Phase = "Fixation",
+                        Phase = "Fixation Objectif",
                         HistoryId = result.hui.HistoryUserIndicatorFOId,
                         result.hui.Name,
                         result.hui.ResultText,
@@ -386,12 +319,30 @@ namespace EvaluationService.Controllers
                     })
                     .ToList<object>();
             }
+            else if (phase.Equals("Finale", StringComparison.OrdinalIgnoreCase))
+            {
+                return _context.HistoryUserIndicatorMPs
+                    .Join(_context.UserEvaluations,
+                        hui => hui.UserEvalId,
+                        ue => ue.UserEvalId,
+                        (hui, ue) => new { hui, ue })
+                    .Where(result => result.ue.UserId == userId && result.ue.EvalId == evalId)
+                    .Select(result => new
+                    {
+                        Phase = "Finale",
+                        HistoryId = result.hui.HistoryUserIndicatorMPId,
+                        result.hui.Name,
+                        result.hui.ResultText,
+                        result.hui.Result
+                    })
+                    .ToList<object>();
+            }
             else
             {
                 return new List<object>();
             }
         }
-
+        
         [HttpGet("historyNonCadre/{userId}/{evalId}/{phase}")]
         public IActionResult GetEvaluationHistoryByPhaseNonCadre(string userId, int evalId, string phase)
         {
@@ -415,55 +366,46 @@ namespace EvaluationService.Controllers
                 competenceAvg = competencesHistory.Average(c => Convert.ToDecimal(c.GetType().GetProperty("Performance").GetValue(c)));
             }
 
-            // Vérifier si les deux listes sont vides
-            if (!competencesHistory.Any() && !indicatorsHistory.Any())
+            // Calculer la somme des indicateurs
+            var indicatorsSum = new List<object>();
+            decimal indicatorAvg = 0;
+            if (indicatorsHistory.Any())
             {
-                return NotFound(new { message = $"Aucun historique de {phase} trouvé pour l'utilisateur, l'évaluation et la phase spécifiés." });
-            }
-
-            // Préparer la réponse de base
-            if (phase.Equals("Mi-Parcours", StringComparison.OrdinalIgnoreCase))
-            {
-                var indicatorsSum = indicatorsHistory
+                indicatorsSum = indicatorsHistory
                     .GroupBy(i => i.GetType().GetProperty("Name").GetValue(i).ToString())
                     .Select(g => new
                     {
                         Name = g.Key,
                         TotalResult = g.Sum(i => Convert.ToDecimal(i.GetType().GetProperty("Result").GetValue(i)))
                     })
-                    .ToList();
+                    .ToList<object>();
 
-                decimal indicatorAvg = indicatorsSum.Any()
-                    ? Math.Round(indicatorsSum.Average(g => g.TotalResult), 2)
+                indicatorAvg = indicatorsSum.Any()
+                    ? Math.Round(indicatorsSum.Average(g => Convert.ToDecimal(g.GetType().GetProperty("TotalResult").GetValue(g))), 2)
                     : 0;
-
-                var extendedResponse = new
-                {
-                    Phase = phase,
-                    EvaluationYear = evaluationYear, // Inclusion unique de l'année d'évaluation
-                    Competences = competencesHistory,
-                    Indicators = indicatorsHistory,
-                    IndicatorsSum = indicatorsSum,
-                    CompetenceAvg = competenceAvg,
-                    IndicatorAvg = indicatorAvg
-                };
-
-                return Ok(extendedResponse);
             }
-            else
+
+            // Vérifier si les deux listes sont vides
+            if (!competencesHistory.Any() && !indicatorsHistory.Any())
             {
-                var baseResponse = new
-                {
-                    Phase = phase,
-                    EvaluationYear = evaluationYear, // Inclusion unique de l'année d'évaluation
-                    Competences = competencesHistory,
-                    Indicators = indicatorsHistory,
-                    CompetenceAvg = competenceAvg
-                };
-
-                return Ok(baseResponse);
+                return NotFound(new { message = $"Aucun historique de {phase} trouvé pour l'utilisateur, l'évaluation et la phase spécifiés." });
             }
+
+            // Préparer la réponse
+            var response = new
+            {
+                Phase = phase,
+                EvaluationYear = evaluationYear,
+                Competences = competencesHistory,
+                Indicators = indicatorsHistory,
+                IndicatorsSum = indicatorsSum,
+                CompetenceAvg = competenceAvg,
+                IndicatorAvg = indicatorAvg
+            };
+
+            return Ok(response);
         }
+
 
         [HttpGet("calculateScore/{userId}/{evalId}/{phase}")]
         public IActionResult CalculateScore(string userId, int evalId, string phase)
@@ -510,12 +452,31 @@ namespace EvaluationService.Controllers
                     indicatorAvg = Math.Round(indicatorsSum.Average(g => g.TotalResult), 2);
                 }
             }
+            if (phase.Equals("Finale", StringComparison.OrdinalIgnoreCase))
+            {
+                var indicatorsHistory = GetIndicatorsHistory(userId, evalId, phase);
+
+                var indicatorsSum = indicatorsHistory
+                    .GroupBy(i => i.GetType().GetProperty("Name").GetValue(i).ToString())
+                    .Select(g => new
+                    {
+                        Name = g.Key,
+                        TotalResult = g.Sum(i => Convert.ToDecimal(i.GetType().GetProperty("Result").GetValue(i)))
+                    })
+                    .ToList();
+
+                if (indicatorsSum.Any())
+                {
+                    indicatorAvg = Math.Round(indicatorsSum.Average(g => g.TotalResult), 2);
+                }
+            }
 
             // Calculer le score selon la formule
             // Si indicatorAvg est null, le score est défini à 0
             decimal score = indicatorAvg.HasValue
-                ? (competenceAvg * competenceWeightTotal / 100) + (indicatorAvg.Value * indicatorWeightTotal / 100)
-                : 0;
+            ? Math.Round((competenceAvg * competenceWeightTotal / 100) + (indicatorAvg.Value * indicatorWeightTotal / 100), 2)
+            : 0;
+
 
             // Préparer la réponse
             var response = new
@@ -529,6 +490,116 @@ namespace EvaluationService.Controllers
             };
 
             return Ok(response);
+        }
+
+        [HttpGet("HelpsByAllowedUserLevel/{allowedUserLevel}")]
+
+        public async Task<IActionResult> GetHelpsByAllowedUserLevel(int allowedUserLevel)
+        {
+            try
+            {
+                // Exécution d'une requête SQL brute pour filtrer par AllowedUserLevel et IsActive
+                var helps = await _context.Helps
+                    .Where(h => h.AllowedUserLevel == allowedUserLevel && h.IsActive)
+                    .Select(h => new
+                    {
+                        h.HelpId,
+                        h.Name,
+                        h.IsActive,
+                        h.AllowedUserLevel,
+                        h.TemplateId
+                    })
+                    .ToListAsync();
+
+                return Ok(helps);
+            }
+            catch (Exception ex)
+            {
+                // Gestion des erreurs
+                return StatusCode(500, new { Message = $"Erreur lors de la récupération des aides : {ex.Message}" });
+            }
+        }
+
+
+        private async Task<Dictionary<string, string>> FetchUsersFromUserServiceAsync()
+        {
+            try
+            {
+                using var httpClient = new HttpClient();
+                // Base URL configurée dans appsettings.json
+                var baseUrl = _configuration["UserService:BaseUrl"];
+                if (string.IsNullOrEmpty(baseUrl))
+                {
+                    throw new Exception("La base URL pour le UserService n'est pas configurée.");
+                }
+
+                var response = await httpClient.GetAsync($"{baseUrl}/api/User/user");
+                if (!response.IsSuccessStatusCode)
+                {
+                    Console.Error.WriteLine($"Erreur lors de l'appel au UserService : {response.ReasonPhrase}");
+                    return new Dictionary<string, string>();
+                }
+
+                // Lire la réponse et convertir en dictionnaire
+                var users = await response.Content.ReadFromJsonAsync<List<UserDTO>>();
+                return users?.ToDictionary(u => u.Id, u => u.Name) ?? new Dictionary<string, string>();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Erreur lors de la récupération des utilisateurs : {ex.Message}");
+                return new Dictionary<string, string>();
+            }
+        }
+
+        [HttpGet("GetHistoryUserHelpContents")]
+        public async Task<IActionResult> GetHistoryUserHelpContents(string userId, int evaluationId)
+        {
+            try
+            {
+                // 1. Récupérer le UserEvalId pour le userId et l'évaluation
+                var userEvalId = await GetUserEvalIdAsync(evaluationId, userId);
+                if (userEvalId == null)
+                {
+                    return NotFound(new { Message = "Évaluation utilisateur non trouvée." });
+                }
+
+                // 2. Récupérer les enregistrements de HistoryUserHelpContents
+                var historyContents = await _context.HistoryUserHelpContents
+                    .Where(h => h.UserEvalId == userEvalId.Value)
+                    .Select(h => new
+                    {
+                        h.ContentId,
+                        h.HelpId,
+                        h.HelpName,
+                        h.Content,
+                        h.WriterUserId,
+                        h.ArchivedAt
+                    })
+                    .ToListAsync();
+
+                // 3. Récupérer les noms des utilisateurs via le UserService
+                var userNames = await FetchUsersFromUserServiceAsync();
+
+                // 4. Ajouter les noms des utilisateurs aux résultats
+                var result = historyContents.Select(h => new
+                {
+                    h.ContentId,
+                    h.HelpId,
+                    h.HelpName,
+                    h.Content,
+                    h.WriterUserId,
+                    WriterUserName = userNames.TryGetValue(h.WriterUserId, out var name) ? name : "Utilisateur inconnu",
+                    h.ArchivedAt
+                });
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                // Gestion des erreurs
+                Console.Error.WriteLine($"Erreur lors de la récupération de l'historique : {ex.Message}");
+                return StatusCode(500, new { Message = $"Une erreur est survenue : {ex.Message}" });
+            }
         }
     }
 

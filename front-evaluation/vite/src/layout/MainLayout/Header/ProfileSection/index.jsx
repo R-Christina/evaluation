@@ -103,6 +103,7 @@ const ProfileSection = () => {
           transition: 'all .2s ease-in-out',
           borderColor: theme.palette.primary.light,
           backgroundColor: theme.palette.primary.light,
+          color: theme.palette.primary.light,
           '&[aria-controls="menu-list-grow"], &:hover': {
             borderColor: theme.palette.primary.main,
             background: `${theme.palette.primary.main}!important`,
@@ -121,11 +122,13 @@ const ProfileSection = () => {
               ...theme.typography.mediumAvatar,
               margin: '8px 0 8px 8px !important',
               cursor: 'pointer',
+              backgroundColor: theme.palette.secondary.main,
+              color: theme.palette.primary.light
             }}
-            ref={anchorRef}
-            aria-controls={open ? 'menu-list-grow' : undefined}
-            aria-haspopup="true"
-          />
+          >
+            {/* Remplacement de l'avatar par la première lettre */}
+            {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+          </Avatar>
         }
         label={<IconSettings stroke={1.5} size="1.5rem" color={theme.palette.primary.main} />}
         variant="outlined"

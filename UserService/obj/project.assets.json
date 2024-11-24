@@ -1608,6 +1608,16 @@
         "runtime": {
           "lib/netcoreapp2.1/_._": {}
         }
+      },
+      "CommonModels/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v8.0",
+        "compile": {
+          "bin/placeholder/CommonModels.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/CommonModels.dll": {}
+        }
       }
     }
   },
@@ -4541,10 +4551,16 @@
         "useSharedDesignerContext.txt",
         "version.txt"
       ]
+    },
+    "CommonModels/1.0.0": {
+      "type": "project",
+      "path": "../CommonModels/CommonModels.csproj",
+      "msbuildProject": "../CommonModels/CommonModels.csproj"
     }
   },
   "projectFileDependencyGroups": {
     "net8.0": [
+      "CommonModels >= 1.0.0",
       "Microsoft.AspNetCore.OpenApi >= 8.0.8",
       "Microsoft.EntityFrameworkCore >= 8.0.10",
       "Microsoft.EntityFrameworkCore.SqlServer >= 8.0.10",
@@ -4578,7 +4594,11 @@
       "frameworks": {
         "net8.0": {
           "targetAlias": "net8.0",
-          "projectReferences": {}
+          "projectReferences": {
+            "D:\\evaluation\\CommonModels\\CommonModels.csproj": {
+              "projectPath": "D:\\evaluation\\CommonModels\\CommonModels.csproj"
+            }
+          }
         }
       },
       "warningProperties": {

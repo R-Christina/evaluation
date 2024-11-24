@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Paper, Grid, Button, CircularProgress ,IconButton ,Alert } from '@mui/material';
-import { authInstance, formulaireInstance } from '../../../axiosConfig'; 
+import { Box, Typography, Paper, Grid, Avatar, Button, CircularProgress, IconButton, Alert } from '@mui/material';
 import MainCard from 'ui-component/cards/MainCard';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import FlagIcon from '@mui/icons-material/Flag';
+import { authInstance, formulaireInstance } from '../../../axiosConfig';
 import { useNavigate } from 'react-router-dom';
 
 const Subordonne = () => {
@@ -26,19 +26,18 @@ const Subordonne = () => {
         setSubordinates(response.data);
 
         const periodNonCadre = await formulaireInstance.get('/Periode/periodeActel', {
-            params: { type: 'NonCadre' }
-          });
-          if (periodNonCadre.data.length > 0) {
-            setCurrentPeriodNonCadre(periodNonCadre.data[0].currentPeriod);
-          }
+          params: { type: 'NonCadre' }
+        });
+        if (periodNonCadre.data.length > 0) {
+          setCurrentPeriodNonCadre(periodNonCadre.data[0].currentPeriod);
+        }
 
         const periodCadre = await formulaireInstance.get('/Periode/periodeActel', {
-            params: { type: 'Cadre' }
-          });
-          if (periodCadre.data.length > 0) {
-            setCurrentPeriodCadre(periodCadre.data[0].currentPeriod);
-          }
-
+          params: { type: 'Cadre' }
+        });
+        if (periodCadre.data.length > 0) {
+          setCurrentPeriodCadre(periodCadre.data[0].currentPeriod);
+        }
       } catch (err) {
         setError(err.message);
       } finally {
@@ -55,17 +54,16 @@ const Subordonne = () => {
     } else if (typeUser === 'NonCadre') {
       navigate(`/manager/fixationNonCadre/${subordinateId}/${typeUser}`);
     }
-  };  
+  };
 
   return (
     <Paper>
       <MainCard>
         <Grid container alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
           <Grid item>
-            <Typography variant="subtitle2">Évaluation des collaborateurs directs</Typography>
-            <Typography variant="h3">
-              Période Cadre: {currentPeriodCadre || 'Aucune'} <span style={{ color: '#3949AB' }}></span>
-              Période Non Cadre: {currentPeriodNonCadre || 'Aucune'} <span style={{ color: '#3949AB' }}></span>
+            <Typography variant="subtitle2">Collaborateurs directs</Typography>
+            <Typography variant="h3" sx={{ marginTop: '0.5rem' }}>
+              Évaluation des collaborateurs directs
             </Typography>
           </Grid>
         </Grid>
@@ -75,78 +73,176 @@ const Subordonne = () => {
         ) : error ? (
           <Typography color="error">{error}</Typography>
         ) : (
-          <Grid container spacing={2}>
-            {subordinates.length === 0 ? (
-                <MainCard>
-                    <Alert severity="warning">Aucun collaborateurs trouver</Alert>
-                </MainCard>
-            ) : (
-              subordinates.map((subordinate) => (
-                <Grid item xs={12} sm={6} md={3} key={subordinate.id}>
-                  <Paper
+          <>
+            <Grid container spacing={3}>
+              {/* Carte Période Cadre */}
+              <Grid item xs={12} sm={6}>
+                <Paper
+                  sx={{
+                    p: 3,
+                    borderRadius: '12px',
+                    backgroundColor: '#3949AB', // Couleur bleu pastel
+                    color: '#fff',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                >
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ color: '#E8EAF6' }}>
+                      Période Cadre
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#FFFFFF' }}>
+                      {currentPeriodCadre || 'Aucune évaluation en cours'}
+                    </Typography>
+                  </Box>
+                  <Box
                     sx={{
-                      p: 2,
-                      height: '200px',
-                      backgroundColor: '#F8FAFC',
-                      borderRadius: '16px',
-                      textAlign: 'center',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      position: 'relative',
-                      border: '2px solid #f4f4f4',
-                      '&:hover': {
-                        border: '1px solid #3949AB'
-                      }
+                      fontSize: '3rem',
+                      opacity: 0.3
                     }}
                   >
-                    {/* Initiales */}
-                    <Box
-                      sx={{
-                        width: '50px',
-                        height: '50px',
-                        borderRadius: '50%',
-                        backgroundColor: '#E3F2FD',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        mb: 1
-                      }}
-                    >
-                      <Typography variant="h4" sx={{ color: '#ff4b07' }}>
-                        {subordinate.name.charAt(0).toUpperCase()}
-                      </Typography>
-                    </Box>
+                    &#8373;
+                  </Box>
+                </Paper>
+              </Grid>
 
-                    {/* Nom */}
-                    <Typography variant="h6" gutterBottom>
-                      {subordinate.name}
+              {/* Carte Période Non Cadre */}
+              <Grid item xs={12} sm={6}>
+                <Paper
+                  sx={{
+                    p: 3,
+                    borderRadius: '12px',
+                    backgroundColor: '#E8EAF6', // Couleur bleu pastel
+                    color: '#fff',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                >
+                  <Box>
+                    <Typography variant="subtitle1">Période Non Cadre</Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#3949AB' }}>
+                      {currentPeriodNonCadre || 'Aucune évaluation en cours'}
                     </Typography>
+                  </Box>
+                  <Box
+                    sx={{
+                      fontSize: '3rem',
+                      opacity: 0.3
+                    }}
+                  >
+                    &#128100;
+                  </Box>
+                </Paper>
+              </Grid>
+            </Grid>
 
-                    {/* Boutons */}
-                    <Box
+            <Grid container spacing={2} mt={5}>
+              {subordinates.length === 0 ? (
+                <MainCard>
+                  <Alert severity="warning">Aucun collaborateurs trouvés</Alert>
+                </MainCard>
+              ) : (
+                subordinates.map((subordinate) => (
+                  <Grid item xs={12} sm={6} md={4} key={subordinate.id}>
+                    <Paper
                       sx={{
-                        display: 'flex',
-                        gap: 1,
-                        mt: 'auto', // Pousse le conteneur de boutons vers le bas
-                        justifyContent: 'center'
+                        p: 3,
+                        backgroundColor: '#fff',
+                        borderRadius: '12px',
+                        textAlign: 'center',
+                        boxShadow: '0 1px 4px rgba(0, 0, 0, 0.1)',
+                        position: 'relative',
+                        '&:hover': {
+                          boxShadow: '0 4px 8px rgba(0, 0, 0, 0.15)'
+                        },
+                        border: '1px solid rgb(227, 232, 239)'
                       }}
                     >
-                      <IconButton color="success">
-                        <BarChartIcon />
-                        </IconButton>
-                        <IconButton sx={{color:'#ffdd00'}} onClick={() => handleFlagClick(subordinate.id, subordinate.typeUser)}>
-                        <FlagIcon />
-                    </IconButton>
-                    </Box>
-                  </Paper>
-                </Grid>
-              ))
-            )}
-          </Grid>
-        )}
+                      <Box
+                        sx={{
+                          width: 72,
+                          height: 72,
+                          borderRadius: '50%',
+                          backgroundColor: '#3949AB', // Fond bleu
+                          color: '#fff', // Texte blanc
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '1.5rem',
+                          fontWeight: 'bold',
+                          margin: '0 auto'
+                        }}
+                      >
+                        {subordinate.name.charAt(0).toUpperCase()}
+                      </Box>
 
+                      {/* Subordinate Name */}
+                      <Typography variant="h6" sx={{ fontWeight: '600', mt: 2 }}>
+                        {subordinate.name}
+                      </Typography>
+
+                      {/* Role */}
+                      <Typography variant="body2" sx={{ color: '#757575', mb: 3 }}>
+                        {subordinate.typeUser}
+                      </Typography>
+
+                      {/* Actions */}
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          gap: 1,
+                          mt: 2
+                        }}
+                      >
+                        {/* Bouton Statistique */}
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          sx={{ textTransform: 'none', flexGrow: 1 }}
+                          onClick={() => console.log('Statistique clicked')}
+                        >
+                          Statistique
+                        </Button>
+
+                        {/* Bouton Evaluation */}
+                        <Button
+                          variant="contained"
+                          size="small"
+                          color="secondary"
+                          sx={{ textTransform: 'none', flexGrow: 1 }}
+                          onClick={() => handleFlagClick(subordinate.id, subordinate.typeUser)}
+                        >
+                          Evaluation
+                        </Button>
+
+                        {/* Bouton Archive */}
+                        <Button
+                          variant="contained"
+                          size="small"
+                          sx={{
+                            textTransform: 'none',
+                            flexGrow: 1,
+                            backgroundColor: '#FFCCBC',
+                            color: '#FF5722',
+                            '&:hover': {
+                              backgroundColor: '#FFCCBC'
+                            }
+                          }}
+                          onClick={() => navigate(`/allEvaluation/cadreYear/${subordinate.id}/${subordinate.typeUser}`)}
+                        >
+                          Archive
+                        </Button>
+                      </Box>
+                    </Paper>
+                  </Grid>
+                ))
+              )}
+            </Grid>
+          </>
+        )}
       </MainCard>
     </Paper>
   );

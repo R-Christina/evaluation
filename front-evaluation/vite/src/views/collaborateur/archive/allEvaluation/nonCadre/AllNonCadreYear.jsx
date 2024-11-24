@@ -3,14 +3,14 @@ import { Card, CardContent, Typography, Grid, IconButton, Paper } from '@mui/mat
 import FolderIcon from '@mui/icons-material/Folder';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import MainCard from 'ui-component/cards/MainCard';
-import { formulaireInstance } from '../../../axiosConfig';
+import { formulaireInstance } from '../../../../../axiosConfig';
 import { useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 
-function MyEvaluation() {
+function AllCadreYear() {
   const [evaluationsByYear, setEvaluationsByYear] = useState([]);
-  const user = JSON.parse(localStorage.getItem('user')) || {};
-  const userId = user.id;
-  const userType = user.typeUser;
+  const { userId, typeUser } = useParams();
+  const userType = typeUser;
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -89,4 +89,4 @@ function MyEvaluation() {
   );
 }
 
-export default MyEvaluation;
+export default AllCadreYear;
