@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, Typography, Grid, IconButton, Paper } from '@mui/material';
+import { Card, CardContent, Typography, Grid, IconButton, Paper, Alert } from '@mui/material';
 import FolderIcon from '@mui/icons-material/Folder';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import MainCard from 'ui-component/cards/MainCard';
@@ -33,13 +33,7 @@ function AllCadreYear() {
   }, [userId]);
 
   const handleEvaluationClick = (evalId) => {
-    if (userType === 'Cadre') {
-      navigate(`/archive/evaluationPhasesCadre/${userId}/${evalId}`);
-    } else if (userType === 'NonCadre') {
-      navigate(`/archive/evaluationPhasesNonCadre/${userId}/${evalId}`);
-    } else {
-      console.error('Invalid user type specified.');
-    }
+    navigate(`/allEvaluation/nonCadreArchive/${userId}/${evalId}`);
   };
 
   return (
@@ -56,6 +50,9 @@ function AllCadreYear() {
           </Grid>
         </Grid>
 
+        {evaluationsByYear.length === 0 ? (
+          <Alert severity="warning">Aucune archive disponible</Alert>
+        ) : (
         <Grid container spacing={3}>
           {evaluationsByYear.map((evaluation) => (
             <Grid item xs={12} sm={6} md={4} key={evaluation.evalId}>
@@ -84,6 +81,7 @@ function AllCadreYear() {
             </Grid>
           ))}
         </Grid>
+        )}
       </MainCard>
     </Paper>
   );

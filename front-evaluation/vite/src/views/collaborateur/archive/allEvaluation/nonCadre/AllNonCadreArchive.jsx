@@ -1,4 +1,4 @@
-import React, { useState, useEffect , useRef} from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -18,7 +18,7 @@ import {
 } from '@mui/material';
 import FolderIcon from '@mui/icons-material/Folder';
 import MainCard from 'ui-component/cards/MainCard';
-import { formulaireInstance } from '../../../../axiosConfig';
+import { authInstance, formulaireInstance } from '../../../../../axiosConfig';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import { useParams } from 'react-router-dom';
 import jsPDF from 'jspdf';
@@ -41,7 +41,7 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
   }
 }));
 
-function EvaluationPhasesNonCadre() {
+function AllNonCadreArchive() {
   const [formTemplate, setFormTemplate] = useState(null);
   const [templateId, setTemplateId] = useState(null);
   const { userId, evalId } = useParams();
@@ -52,18 +52,15 @@ function EvaluationPhasesNonCadre() {
   const [indicatorAvg, setIndicatorAvg] = useState([]);
   const [scoreData, setScoreData] = useState(null);
   const [evaluationDetails, setEvaluationDetails] = useState(null);
-  const user = JSON.parse(localStorage.getItem('user')) || {};
-  const userNon = user.name;
-  const poste = user.poste;
-  const departement = user.department;
-  const superiorName = user.superiorName;
 
-  const printRef = useRef();
+  const [userDetails, setUserDetails] = useState(null);
 
   const [helpContents, setHelpContents] = useState([]);
 
   const phases = ['Fixation Objectif', 'Mi-Parcours', 'Finale'];
   const [isContentVisible, setIsContentVisible] = useState(true);
+
+  const printRef = useRef();
 
   const groupedIndicators =
     historyByPhase?.indicators?.reduce((acc, indicator) => {
@@ -102,11 +99,26 @@ function EvaluationPhasesNonCadre() {
     fetchTemplate();
   }, [templateId]);
 
+  const fetchUserDetails = async () => {
+    try {
+      const response = await authInstance.get(`/User/user/${userId}`);
+      if (response && response.data) {
+        setUserDetails(response.data); // Mettre à jour les détails utilisateur
+        console.log(response.data);
+      } else {
+        console.error('Unexpected response structure:', response);
+      }
+    } catch (error) {
+      console.error('Error fetching user details:', error);
+    }
+  };
+
   useEffect(() => {
     // Charger la phase "Fixation" par défaut
     handlePhaseClick('Fixation Objectif');
     fetchEvaluationDetails();
     fetchHelpContents();
+    fetchUserDetails();
   }, []);
 
   const fetchEvaluationDetails = async () => {
@@ -161,7 +173,7 @@ function EvaluationPhasesNonCadre() {
         const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-        pdf.save(`${userNon} formulaire_Non_Cadre.pdf`);
+        pdf.save(`${userDetails?.name} formulaire_Non_Cadre.pdf`);
       })
       .catch((err) => {
         console.error('Erreur lors de la génération du PDF', err);
@@ -233,14 +245,14 @@ function EvaluationPhasesNonCadre() {
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
                 <Typography variant="body1">
-                  Nom : <span style={{ color: '#3949AB' }}>{userNon}</span>
+                  Nom : <span style={{ color: '#3949AB' }}>{userDetails?.name || 'N/A'}</span>
                 </Typography>
                 <Typography variant="body1">Matricule :</Typography>
                 <Typography variant="body1">
-                  Poste : <span style={{ color: '#3949AB' }}>{poste}</span>
+                  Poste : <span style={{ color: '#3949AB' }}> {userDetails?.poste || 'N/A'}</span>
                 </Typography>
                 <Typography variant="body1">
-                  Département : <span style={{ color: '#3949AB' }}>{departement}</span>
+                  Département : <span style={{ color: '#3949AB' }}>{userDetails?.department || 'N/A'} </span>
                 </Typography>
               </Paper>
             </Grid>
@@ -251,7 +263,7 @@ function EvaluationPhasesNonCadre() {
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
                 <Typography variant="body1">
-                  Nom : <span style={{ color: '#3949AB' }}>{superiorName}</span>
+                  Nom : <span style={{ color: '#3949AB' }}> {userDetails?.superiorName || 'N/A'}</span>
                 </Typography>
               </Paper>
             </Grid>
@@ -453,4 +465,4 @@ function EvaluationPhasesNonCadre() {
     </Paper>
   );
 }
-export default EvaluationPhasesNonCadre;
+export default AllNonCadreArchive;

@@ -31,10 +31,12 @@ function EvaluationPhasesCadre() {
   const [totalWeightingSum, setTotalWeightingSum] = useState(0);
   const [totalResultSum, setTotalResultSum] = useState(0);
   const user = JSON.parse(localStorage.getItem('user')) || {};
-  const userNon = user.name;
-  const poste = user.poste;
-  const departement = user.department;
-  const superiorName = user.superiorName;
+  const userNon = user.name || 'Utilisateur';
+  const poste = user.poste || 'N/A';
+  const departement = user.department || 'N/A';
+  const superiorName = user.superiorName || 'N/A';
+
+  const [isContentVisible, setIsContentVisible] = useState(true);
 
   const printRef = useRef();
 
@@ -42,6 +44,7 @@ function EvaluationPhasesCadre() {
     // Charger la phase "Fixation" par défaut
     handlePhaseClick('Fixation');
     fetchEvaluationDetails();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchEvaluationDetails = async () => {
@@ -50,10 +53,10 @@ function EvaluationPhasesCadre() {
       if (response && response.data) {
         setEvaluationDetails(response.data);
       } else {
-        console.error('Unexpected response structure:', response);
+        console.error('Structure de réponse inattendue:', response);
       }
     } catch (error) {
-      console.error('Error fetching evaluation details:', error);
+      console.error("Erreur lors de la récupération des détails de l'évaluation:", error);
     }
   };
 
@@ -75,16 +78,16 @@ function EvaluationPhasesCadre() {
           return updatedHistory;
         });
       } else {
-        console.error('Unexpected response structure:', response);
+        console.error('Structure de réponse inattendue:', response);
       }
     } catch (error) {
-      console.error('Error fetching total weighting:', error);
+      console.error('Erreur lors de la récupération de la pondération totale:', error);
     }
   };
 
-  const fetchTotalWeightingAndResult = async () => {
+  const fetchTotalWeightingAndResult = async (phase) => {
     try {
-      const response = await formulaireInstance.get(`/archive/priority/totalWeightingAndResult/${evalId}/${userId}`);
+      const response = await formulaireInstance.get(`/archive/priority/totalWeightingAndResult/${evalId}/${userId}/${phase}`);
       if (response && response.data) {
         setTotalWeightingSum(response.data.totalWeightingSum);
         setTotalResultSum(response.data.totalResultSum);
@@ -101,30 +104,34 @@ function EvaluationPhasesCadre() {
           return updatedHistory;
         });
       } else {
-        console.error('Unexpected response structure:', response);
+        console.error('Structure de réponse inattendue:', response);
       }
     } catch (error) {
-      console.error('Error fetching total weighting and result:', error);
+      console.error('Erreur lors de la récupération de la pondération et des résultats:', error);
     }
   };
 
   const handlePhaseClick = async (phase) => {
     setActivePhase(phase);
-    try {
-      const response = await formulaireInstance.get(`/archive/historyCadre/${userId}/${evalId}/${phase}`);
-      if (response && response.data) {
-        setHistoryByPhase(response.data);
-        if (phase === 'Fixation') {
-          fetchTotalWeighting();
-        } else if (phase === 'Mi-Parcours') {
-          fetchTotalWeightingAndResult();
+    setIsContentVisible(false); // Déclencher l'animation de sortie
+
+    setTimeout(async () => {
+      try {
+        const response = await formulaireInstance.get(`/archive/historyCadre/${userId}/${evalId}/${phase}`);
+        if (response && response.data) {
+          setHistoryByPhase(response.data);
+          if (phase === 'Fixation') {
+            await fetchTotalWeighting();
+          } else if (phase === 'Mi-Parcours' || phase === 'Évaluation Finale') {
+            await fetchTotalWeightingAndResult(phase);
+          }
         }
-      } else {
-        console.error('Unexpected response structure:', response);
+      } catch (error) {
+        console.error("Erreur lors de la récupération de l'historique de la phase:", error);
+      } finally {
+        setIsContentVisible(true); // Déclencher l'animation d'entrée
       }
-    } catch (error) {
-      console.error('Error fetching phase history:', error);
-    }
+    }, 400); // Synchronisé avec la transition CSS
   };
 
   const groupedData = historyByPhase.reduce((acc, curr) => {
@@ -156,10 +163,11 @@ function EvaluationPhasesCadre() {
         const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-        pdf.save(`${userNon} formulaire_Cadre.pdf`);
+        const sanitizedUserName = userNon.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        pdf.save(`${sanitizedUserName}_formulaire_Cadre.pdf`);
       })
       .catch((err) => {
-        console.error('Erreur lors de la génération du PDF', err);
+        console.error('Erreur lors de la génération du PDF:', err);
       });
   };
 
@@ -181,7 +189,7 @@ function EvaluationPhasesCadre() {
         </Grid>
 
         <Grid container spacing={3}>
-          {['Fixation', 'Mi-Parcours'].map((phase) => (
+          {['Fixation', 'Mi-Parcours', 'Évaluation Finale'].map((phase) => (
             <Grid item xs={12} sm={6} md={4} key={phase}>
               <Card
                 sx={{
@@ -205,7 +213,16 @@ function EvaluationPhasesCadre() {
           ))}
         </Grid>
 
-        <Box sx={{ padding: 2 }} ref={printRef}>
+        <Box
+          sx={{
+            padding: 2,
+            opacity: isContentVisible ? 1 : 0,
+            transform: isContentVisible ? 'translateY(0)' : 'translateY(10px)',
+            transition: 'opacity 0.5s ease, transform 0.5s ease', // Synchronisé avec setTimeout
+            willChange: 'opacity, transform'
+          }}
+          ref={printRef}
+        >
           {evaluationDetails && (
             <Typography variant="h4" align="center" sx={{ backgroundColor: '#d4edda', padding: 1, fontWeight: 'bold', mt: 2 }}>
               {evaluationDetails.titre}
@@ -222,7 +239,7 @@ function EvaluationPhasesCadre() {
                 <Typography variant="body1">
                   Nom : <span style={{ color: '#3949AB' }}>{userNon}</span>
                 </Typography>
-                <Typography variant="body1">Matricule :</Typography>
+                <Typography variant="body1">Matricule : {user.matricule || 'N/A'}</Typography>
                 <Typography variant="body1">
                   Poste : <span style={{ color: '#3949AB' }}>{poste}</span>
                 </Typography>
@@ -257,11 +274,12 @@ function EvaluationPhasesCadre() {
                     INDICATEURS DE RÉSULTAT
                   </TableCell>
                   <TableCell sx={{ backgroundColor: '#3f51b5', color: 'white' }}>RÉSULTATS en % d’atteinte sur 100%</TableCell>
-                  {columnNames.map((columnName, index) => (
-                    <TableCell key={index} sx={{ backgroundColor: '#DFEDFF', color: 'black' }}>
-                      {columnName}
-                    </TableCell>
-                  ))}
+                  {columnNames?.length > 0 &&
+                    columnNames.map((columnName) => (
+                      <TableCell key={columnName} sx={{ backgroundColor: '#DFEDFF', color: 'black' }}>
+                        {columnName}
+                      </TableCell>
+                    ))}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -274,6 +292,7 @@ function EvaluationPhasesCadre() {
                       >
                         {priorityName}
                         <Typography variant="caption" display="block">
+                          {/* Vous pouvez décommenter et ajuster si nécessaire */}
                           {/* ({objectives[0].weighting}% / {objectives[0].totalWeighting || 0}%) */}
                         </Typography>
                       </TableCell>
@@ -292,15 +311,13 @@ function EvaluationPhasesCadre() {
                         <TableCell sx={{ borderRight: '1px solid #ddd' }}>
                           {objective.result && objective.result !== 0 ? `${objective.result}%` : ' '}
                         </TableCell>
-                          {objective.columnValues && objective.columnValues.length > 0 ? (
-                            objective.columnValues.map((column, index) => (
-                              <TableCell key={index} sx={{ borderRight: '1px solid #ddd' }}>
-                                {column.value !== "N/A" ? column.value : ""}
-                              </TableCell>
-                            ))
-                          ) : (
-                            <TableCell sx={{ borderRight: '1px solid #ddd' }}>Aucune donnée</TableCell>
-                          )}
+                        {objective.columnValues &&
+                          objective.columnValues.length > 0 &&
+                          objective.columnValues.map((column) => (
+                            <TableCell key={column.columnName} sx={{ borderRight: '1px solid #ddd' }}>
+                              {column.value !== 'N/A' ? column.value : ''}
+                            </TableCell>
+                          ))}
                       </TableRow>
                     ))}
                     <TableRow sx={{ backgroundColor: '#e8f5e9' }}>
@@ -336,19 +353,25 @@ function EvaluationPhasesCadre() {
               <Box sx={{ border: '1px solid #ddd', borderRadius: '8px', padding: 2, backgroundColor: '#f9f9f9' }}>
                 <Typography variant="body1" sx={{ mb: 1 }}>
                   Date de fixation des objectifs :{' '}
-                  {new Date(evaluationDetails?.fixationObjectif).toLocaleDateString('fr-FR', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
+                  {evaluationDetails?.fixationObjectif
+                    ? new Date(evaluationDetails.fixationObjectif).toLocaleDateString('fr-FR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })
+                    : 'N/A'}
                 </Typography>
                 <Typography variant="body1" sx={{ mb: 1 }}>
                   Date évaluation mi-parcours :{' '}
-                  {new Date(evaluationDetails?.miParcours).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  {evaluationDetails?.miParcours
+                    ? new Date(evaluationDetails.miParcours).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })
+                    : 'N/A'}
                 </Typography>
                 <Typography variant="body1">
                   Date de l'entretien final :{' '}
-                  {new Date(evaluationDetails?.final).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  {evaluationDetails?.final
+                    ? new Date(evaluationDetails.final).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })
+                    : 'N/A'}
                 </Typography>
               </Box>
             </Grid>

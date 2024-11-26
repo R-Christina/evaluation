@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, Typography, Grid, IconButton, Paper } from '@mui/material';
+import { Card, CardContent, Typography, Grid, IconButton, Paper, Alert } from '@mui/material';
 import FolderIcon from '@mui/icons-material/Folder';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import MainCard from 'ui-component/cards/MainCard';
@@ -56,34 +56,41 @@ function MyEvaluation() {
           </Grid>
         </Grid>
 
-        <Grid container spacing={3}>
-          {evaluationsByYear.map((evaluation) => (
-            <Grid item xs={12} sm={6} md={4} key={evaluation.evalId}>
-              <Card
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '10px 20px',
-                  backgroundColor: '#E8EAF6',
-                  '&:hover': {
-                    backgroundColor: '#e3eaf5',
-                  },
-                }}
-                onClick={() => handleEvaluationClick(evaluation.evalId)}
-              >
-                <FolderIcon sx={{ fontSize: 24, color: 'rgb(57, 73, 171)', marginRight: '16px' }} />
-                <CardContent sx={{ flexGrow: 1, padding: 0 }}>
-                  <Typography variant="body1" sx={{ color: '#1a202c' }}>
-                    {evaluation.evalAnnee}
-                  </Typography>
-                </CardContent>
-                <IconButton>
-                  <MoreVertIcon sx={{ fontSize: 20, color: '#757575' }} />
-                </IconButton>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+        {/* Vérification si evaluationsByYear est vide */}
+        {evaluationsByYear.length === 0 ? (
+          <Alert severity="warning">Aucune archive disponible</Alert>
+        ) : (
+          <Grid container spacing={3}>
+            {evaluationsByYear.map((evaluation) => (
+              <Grid item xs={12} sm={6} md={4} key={evaluation.evalId}>
+                <Card
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '10px 20px',
+                    backgroundColor: '#E8EAF6',
+                    '&:hover': {
+                      backgroundColor: '#e3eaf5',
+                    },
+                    cursor: 'pointer', // Ajout d'un curseur pointer pour indiquer que c'est cliquable
+                  }}
+                  onClick={() => handleEvaluationClick(evaluation.evalId)}
+                >
+                  <FolderIcon sx={{ fontSize: 24, color: 'rgb(57, 73, 171)', marginRight: '16px' }} />
+                  <CardContent sx={{ flexGrow: 1, padding: 0 }}>
+                    <Typography variant="body1" sx={{ color: '#1a202c' }}>
+                      {evaluation.evalAnnee}
+                    </Typography>
+                  </CardContent>
+                  <IconButton>
+                    <MoreVertIcon sx={{ fontSize: 20, color: '#757575' }} />
+                  </IconButton>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        )}
+
       </MainCard>
     </Paper>
   );

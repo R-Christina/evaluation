@@ -69,7 +69,8 @@ namespace UserService.Controllers
             return users;
         }
 
-        private List<UserAD> GetUsersFromActiveDirectory()
+        [HttpGet("huhu")]
+        public List<UserAD> GetUsersFromActiveDirectory()
         {
             List<UserAD> users = new List<UserAD>();
             string domainPath = "LDAP://corp.ravinala";

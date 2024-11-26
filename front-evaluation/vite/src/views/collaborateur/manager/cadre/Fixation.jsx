@@ -21,8 +21,9 @@ const Fixation = () => {
   const [success, setSuccessMessage] = useState(null);
   const [isValidated, setIsValidated] = useState(false);
   const [isMidtermValidated, setIsMidtermValidated] = useState(false);
+  const [isFinaleValidated, setIsFinaleValidated] = useState(false);
 
-  const checkUserValidationHistory = async () => {
+  const checkIfIValidate = async () => {
     try {
       setError(null); // Réinitialise les erreurs précédentes
       setSuccessMessage(null);
@@ -102,6 +103,32 @@ const Fixation = () => {
     }
   };
 
+  const fetchHistoryFinale = async (userId, type) => {  
+    try {
+      const response = await formulaireInstance.get('/Evaluation/getHistoryFinale', {
+        params: {  userId: subordinateId, type: typeUser },
+      });
+  
+      console.log('API Response:', response.data);
+  
+      if (response.data && response.data.length > 0) {
+        setIsFinaleValidated(true);
+        return response.data;
+      } else {
+        setIsFinaleValidated(false);
+        return [];
+      }
+    } catch (err) {
+      console.error('Error in fetchHistoryFinale:', err);
+  
+      if (err.response) {
+        console.error('Server Response:', err.response.data);
+      } else {
+        console.error('Network or Unknown Error:', err.message);
+      }
+    }
+  }; 
+
   const fetchCurrentPeriod = async (evalId) => {
     try {
       const response = await formulaireInstance.get(`/Periode/periodeActuel/${evalId}`);
@@ -129,7 +156,9 @@ const Fixation = () => {
             result: objective.result || 0, // Fixed typo (was "objectif.Result")
             objectiveColumnValues: (objective.objectiveColumnValues || []).map((column) => ({
               columnName: column.objectiveColumn?.name || 'Non défini',
-              value: column.value || ''
+              value: currentPeriod === 'Évaluation Finale'
+              ? column.evaluationFinaleValue || ''
+              : column.value || ''
             }))
           };
 
@@ -151,9 +180,12 @@ const Fixation = () => {
 
       // Determine the API endpoint based on the period
       const endpoint =
-        currentPeriod === 'Fixation Objectif' ? '/Evaluation/validateUserObjectivesHistory' : '/Evaluation/validateMitermObjectif';
+        currentPeriod === 'Fixation Objectif'
+          ? '/Evaluation/validateUserObjectivesHistory'
+          : currentPeriod === 'Mi-Parcours'
+            ? '/Evaluation/validateMitermObjectif'
+            : '/Evaluation/validateFinale';
 
-      // Send the request
       const response = await formulaireInstance.post(endpoint, payload, {
         params: {
           validatorUserId: managerId,
@@ -161,6 +193,10 @@ const Fixation = () => {
           type: typeUser
         }
       });
+      if(currentPeriod === 'Fixation Objectif')
+      {
+        setIsValidated(true);
+      }
 
       setSuccessMessage(response.data.Message || 'Validation effectuée avec succès.');
     } catch (err) {
@@ -181,9 +217,7 @@ const Fixation = () => {
 
         if (evalId) {
           await fetchCurrentPeriod(evalId);
-          await fetchUserObjectives(evalId, subordinateId); // Récupérer les objectifs utilisateur
-          await checkUserValidationHistory();
-          await fetchHistoryCMps();
+          await fetchUserObjectives(evalId, subordinateId);
         }
       } catch (err) {
         console.error('Erreur complète:', err);
@@ -197,16 +231,39 @@ const Fixation = () => {
     fetchEvaluationId();
   }, [typeUser, subordinateId]);
 
+  useEffect(() => {
+    const fetchMidtermData = async () => {
+      if( currentPeriod === 'Fixation Objectif')
+      {
+        await checkIfIValidate();
+      }
+      if(currentPeriod === 'Mi-Parcours' && evaluationId) {
+        await fetchHistoryCMps();
+      }
+      if(currentPeriod === 'Évaluation Finale' && evaluationId){
+        await fetchHistoryFinale();
+      }
+    };
+    fetchMidtermData();
+  }, [currentPeriod, evaluationId]);
+
   const handleObjectiveChange = (groupName, index, field, value, colIndex = null) => {
     const updatedGroupedObjectives = { ...groupedObjectives };
-
+  
     if (colIndex !== null && field === 'objectiveColumnValues') {
       // Mettre à jour uniquement la colonne spécifique
       updatedGroupedObjectives[groupName][index] = {
         ...updatedGroupedObjectives[groupName][index],
-        objectiveColumnValues: updatedGroupedObjectives[groupName][index].objectiveColumnValues.map((column, i) =>
-          i === colIndex ? { ...column, value } : column
-        )
+        objectiveColumnValues: updatedGroupedObjectives[groupName][index].objectiveColumnValues.map((column, i) => {
+          if (i === colIndex) {
+            if (currentPeriod === 'Évaluation Finale') {
+              return { ...column, evaluationFinaleValue: value };
+            } else {
+              return { ...column, value: value };
+            }
+          }
+          return column;
+        })
       };
     } else {
       // Mettre à jour un champ général (description, weighting, etc.)
@@ -215,10 +272,10 @@ const Fixation = () => {
         [field]: value
       };
     }
-
+  
     // Mettre à jour l'état
     setGroupedObjectives(updatedGroupedObjectives);
-  };
+  };  
 
   return (
     <Paper>
@@ -293,6 +350,16 @@ const Fixation = () => {
                                       }}
                                       sx={{ mb: 2, mt: 1 }}
                                     />
+                                    <TextField
+                                      label="Indicateur de Résultat"
+                                      fullWidth
+                                      variant="outlined"
+                                      multiline
+                                      minRows={4}
+                                      value={objectives[currentIndex]?.resultIndicator || ''}
+                                      onChange={(e) => handleObjectiveChange(groupName, currentIndex, 'resultIndicator', e.target.value)}
+                                      sx={{ mb: 2, mt: 1 }}
+                                    />
                                   </Box>
                                   <Box display="flex" justifyContent="right" alignItems="center" mt={2}>
                                     <IconButton
@@ -333,11 +400,13 @@ const Fixation = () => {
                       <Alert severity="info">Aucun objectif défini pour la période de Fixation Objectif.</Alert>
                     )}
 
-                    <Box display="flex" justifyContent="center" mt={4}>
-                      <Button variant="contained" color="primary" onClick={handleValidationHistory}>
-                        Valider les Objectifs
-                      </Button>
-                    </Box>
+                    {Object.keys(groupedObjectives).length > 0 && (
+                      <Box display="flex" justifyContent="center" mt={4}>
+                        <Button variant="contained" color="primary" onClick={handleValidationHistory}>
+                          Valider les Objectifs
+                        </Button>
+                      </Box>
+                    )}
                   </>
                 )}
               </>
@@ -355,6 +424,9 @@ const Fixation = () => {
                       Object.keys(groupedObjectives).map((groupName) => {
                         const objectives = groupedObjectives[groupName];
                         const currentIndex = objectiveIndices[groupName];
+
+                        console.log(`Group: ${groupName}, Current Index: ${currentIndex}`);
+                        console.log('Current Objective:', objectives[currentIndex]);
 
                         return (
                           <>
@@ -490,9 +562,185 @@ const Fixation = () => {
                       <Alert severity="info">Aucun objectif défini pour la période de Mi-Parcours.</Alert>
                     )}
 
+                    <Box display="flex" justifyContent="left" mt={4}>
+                      <Button variant="contained" color="primary" onClick={handleValidationHistory}>
+                        Valider
+                      </Button>
+                    </Box>
+                  </>
+                )}
+              </>
+            )}
+
+            {currentPeriod === 'Évaluation Finale' && (
+              <>
+                {isFinaleValidated ? (
+                  <Alert severity="success" sx={{ mb: 3 }}>
+                    Le collaboarteur a déjà valider.
+                  </Alert>
+                ) : (
+                  <>
+                    {Object.keys(groupedObjectives).length > 0 ? (
+                      Object.keys(groupedObjectives).map((groupName) => {
+                        const objectives = groupedObjectives[groupName];
+                        const currentIndex = objectiveIndices[groupName];
+
+                        return (
+                          <>
+                            <MainCard key={groupName} sx={{ mt: 3, p: 2, backgroundColor: '#E8EAF6' }}>
+                              <Typography variant="h5" sx={{ mb: 3 }} gutterBottom>
+                                {groupName}
+                              </Typography>
+
+                              <AnimatePresence mode="wait">
+                                <motion.div
+                                  key={currentIndex}
+                                  initial={{ opacity: 0, x: 50 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  exit={{ opacity: 0, x: -50 }}
+                                  transition={{ duration: 0.5 }}
+                                >
+                                  {currentPeriod === 'Évaluation Finale' && (
+                                    <Typography variant="caption" sx={{ color: 'gray', mt: -1 }}>
+                                      <span style={{ color: 'red' }}>* </span>
+                                      Ce champ ne peut pas être modifié pendant cet période.
+                                    </Typography>
+                                  )}
+                                  <TextField
+                                    label="Objectif"
+                                    fullWidth
+                                    variant="outlined"
+                                    multiline
+                                    minRows={4}
+                                    value={objectives[currentIndex]?.description || ''}
+                                    onChange={(e) => handleObjectiveChange(groupName, currentIndex, 'description', e.target.value)}
+                                    sx={{ mb: 2, mt: 1 }}
+                                    disabled={currentPeriod === 'Évaluation Finale'}
+                                  />
+
+                                  {currentPeriod === 'Évaluation Finale' && (
+                                    <Typography variant="caption" sx={{ color: 'gray', mt: -1 }}>
+                                      <span style={{ color: 'red' }}>* </span>
+                                      Ce champ ne peut pas être modifié pendant cet période.
+                                    </Typography>
+                                  )}
+                                  <TextField
+                                    label="Ponération"
+                                    fullWidth
+                                    variant="outlined"
+                                    value={objectives[currentIndex]?.weighting || ''}
+                                    onChange={(e) => {
+                                      let value = e.target.value;
+                                      if (!/^\d{0,3}([.,]\d{0,2})?$/.test(value)) return;
+                                      value = value.replace(',', '.');
+                                      handleObjectiveChange(groupName, currentIndex, 'weighting', value);
+                                    }}
+                                    sx={{ mb: 2, mt: 1 }}
+                                    disabled={currentPeriod === 'Évaluation Finale'}
+                                  />
+                                  {currentPeriod === 'Évaluation Finale' && (
+                                    <Typography variant="caption" sx={{ color: 'gray', mt: -1 }}>
+                                      <span style={{ color: 'red' }}>* </span>
+                                      Ce champ ne peut pas être modifié pendant cet période.
+                                    </Typography>
+                                  )}
+
+                                  <TextField
+                                    label="Indicateur de Résultat"
+                                    fullWidth
+                                    variant="outlined"
+                                    multiline
+                                    minRows={4}
+                                    value={objectives[currentIndex]?.resultIndicator || ''}
+                                    onChange={(e) => handleObjectiveChange(groupName, currentIndex, 'resultIndicator', e.target.value)}
+                                    sx={{ mb: 2, mt: 1 }}
+                                    disabled={currentPeriod === 'Évaluation Finale'}
+                                  />
+
+                                  <TextField
+                                    label="Résultat"
+                                    fullWidth
+                                    variant="outlined"
+                                    type="text"
+                                    value={objectives[currentIndex]?.result || ''}
+                                    onChange={(e) => {
+                                      let value = e.target.value;
+                                      if (!/^\d{0,3}([.,]\d{0,2})?$/.test(value)) return;
+                                      value = value.replace(',', '.');
+                                      handleObjectiveChange(groupName, currentIndex, 'result', value);
+                                    }}
+                                    sx={{ mb: 2, mt: 1 }}
+                                    inputProps={{ maxLength: 6 }}
+                                  />
+
+                                  {Array.isArray(objectives[currentIndex]?.objectiveColumnValues) &&
+                                    objectives[currentIndex]?.objectiveColumnValues.map((column, colIndex) => (
+                                      <Box key={column.valueId || colIndex} sx={{ mb: 2, mt: 1 }}>
+                                        <Typography variant="subtitle1" gutterBottom>
+                                          {column.objectiveColumn?.name || `Colonne ${colIndex + 1}`}
+                                        </Typography>
+
+                                        <TextField
+                                          fullWidth
+                                          variant="outlined"
+                                          value={column.evaluationFinaleValue || ''}
+                                          multiline
+                                          minRows={4}
+                                          onChange={(e) =>
+                                            handleObjectiveChange(
+                                              groupName,
+                                              currentIndex,
+                                              'objectiveColumnValues',
+                                              e.target.value,
+                                              colIndex
+                                            )
+                                          }
+                                        />
+                                      </Box>
+                                    ))}
+
+                                  <Box display="flex" justifyContent="right" alignItems="center" mt={2}>
+                                    <IconButton
+                                      onClick={() =>
+                                        setObjectiveIndices((prev) => ({
+                                          ...prev,
+                                          [groupName]: Math.max(currentIndex - 1, 0)
+                                        }))
+                                      }
+                                      disabled={currentIndex === 0}
+                                      sx={{ color: 'success.main' }}
+                                    >
+                                      <KeyboardArrowLeft />
+                                    </IconButton>
+                                    <Typography variant="body1" sx={{ mx: 2 }}>
+                                      {currentIndex + 1} / {objectives.length}
+                                    </Typography>
+                                    <IconButton
+                                      onClick={() =>
+                                        setObjectiveIndices((prev) => ({
+                                          ...prev,
+                                          [groupName]: Math.min(currentIndex + 1, objectives.length - 1)
+                                        }))
+                                      }
+                                      disabled={currentIndex === objectives.length - 1}
+                                      sx={{ color: 'success.main' }}
+                                    >
+                                      <KeyboardArrowRight />
+                                    </IconButton>
+                                  </Box>
+                                </motion.div>
+                              </AnimatePresence>
+                            </MainCard>
+                          </>
+                        );
+                      })
+                    ) : (
+                      <Alert severity="info">Aucun objectif défini pour la période d'évaluation finale</Alert>
+                    )}
+
                     <Box display="flex" justifyContent="center" mt={4}>
                       <Button variant="contained" color="primary" onClick={handleValidationHistory}>
-                        Valider les Objectifs
+                        Valider
                       </Button>
                     </Box>
                   </>

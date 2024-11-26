@@ -40,16 +40,22 @@ namespace EvaluationService.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Helps",
+                name: "HistoryUserHelpContents",
                 columns: table => new
                 {
-                    HelpId = table.Column<int>(type: "int", nullable: false)
+                    HistoryContentId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    Name = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false)
+                    HelpId = table.Column<int>(type: "int", nullable: false),
+                    HelpName = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
+                    ContentId = table.Column<int>(type: "int", nullable: false),
+                    UserEvalId = table.Column<int>(type: "int", nullable: false),
+                    WriterUserId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Content = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
+                    ArchivedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Helps", x => x.HelpId);
+                    table.PrimaryKey("PK_HistoryUserHelpContents", x => x.HistoryContentId);
                 });
 
             migrationBuilder.CreateTable(
@@ -134,6 +140,28 @@ namespace EvaluationService.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Helps",
+                columns: table => new
+                {
+                    HelpId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Name = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
+                    TemplateId = table.Column<int>(type: "int", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    AllowedUserLevel = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Helps", x => x.HelpId);
+                    table.ForeignKey(
+                        name: "FK_Helps_FormTemplates_TemplateId",
+                        column: x => x.TemplateId,
+                        principalTable: "FormTemplates",
+                        principalColumn: "TemplateId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Indicators",
                 columns: table => new
                 {
@@ -141,7 +169,8 @@ namespace EvaluationService.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     label = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     MaxResults = table.Column<int>(type: "int", nullable: false),
-                    TemplateId = table.Column<int>(type: "int", nullable: false)
+                    TemplateId = table.Column<int>(type: "int", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -245,6 +274,32 @@ namespace EvaluationService.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "HistoryCFis",
+                columns: table => new
+                {
+                    HcfiId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    UserEvalId = table.Column<int>(type: "int", nullable: false),
+                    PriorityName = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
+                    Weighting = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    ResultIndicator = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Result = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    ValidatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_HistoryCFis", x => x.HcfiId);
+                    table.ForeignKey(
+                        name: "FK_HistoryCFis_UserEvaluations_UserEvalId",
+                        column: x => x.UserEvalId,
+                        principalTable: "UserEvaluations",
+                        principalColumn: "UserEvalId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "HistoryCFos",
                 columns: table => new
                 {
@@ -280,6 +335,7 @@ namespace EvaluationService.Migrations
                     Weighting = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
                     ResultIndicator = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Result = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    ValidatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
@@ -343,8 +399,10 @@ namespace EvaluationService.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     UserEvalId = table.Column<int>(type: "int", nullable: false),
                     Name = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
-                    ResultText = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    Result = table.Column<decimal>(type: "decimal(18,2)", nullable: true)
+                    ResultText = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Result = table.Column<decimal>(type: "decimal(18,2)", nullable: true),
+                    ValidatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -414,7 +472,7 @@ namespace EvaluationService.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     UserEvalId = table.Column<int>(type: "int", nullable: false),
                     HelpId = table.Column<int>(type: "int", nullable: false),
-                    UserId = table.Column<int>(type: "int", nullable: false),
+                    WriterUserId = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Content = table.Column<string>(type: "nvarchar(max)", nullable: false)
                 },
                 constraints: table =>
@@ -494,6 +552,29 @@ namespace EvaluationService.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "HistoryObjectiveColumnValuesFis",
+                columns: table => new
+                {
+                    HistValueId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    HcfiId = table.Column<int>(type: "int", nullable: false),
+                    ColumnName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Value = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ValidatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_HistoryObjectiveColumnValuesFis", x => x.HistValueId);
+                    table.ForeignKey(
+                        name: "FK_HistoryObjectiveColumnValuesFis_HistoryCFis_HcfiId",
+                        column: x => x.HcfiId,
+                        principalTable: "HistoryCFis",
+                        principalColumn: "HcfiId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "HistoryObjectiveColumnValuesFos",
                 columns: table => new
                 {
@@ -502,6 +583,7 @@ namespace EvaluationService.Migrations
                     HcfId = table.Column<int>(type: "int", nullable: false),
                     ColumnName = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Value = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ValidatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
@@ -524,6 +606,7 @@ namespace EvaluationService.Migrations
                     HcmId = table.Column<int>(type: "int", nullable: false),
                     ColumnName = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Value = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ValidatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
@@ -611,6 +694,16 @@ namespace EvaluationService.Migrations
                 column: "TemplateId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Helps_TemplateId",
+                table: "Helps",
+                column: "TemplateId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_HistoryCFis_UserEvalId",
+                table: "HistoryCFis",
+                column: "UserEvalId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_HistoryCFos_UserEvalId",
                 table: "HistoryCFos",
                 column: "UserEvalId");
@@ -619,6 +712,11 @@ namespace EvaluationService.Migrations
                 name: "IX_HistoryCMps_UserEvalId",
                 table: "HistoryCMps",
                 column: "UserEvalId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_HistoryObjectiveColumnValuesFis_HcfiId",
+                table: "HistoryObjectiveColumnValuesFis",
+                column: "HcfiId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_HistoryObjectiveColumnValuesFos_HcfId",
@@ -733,6 +831,9 @@ namespace EvaluationService.Migrations
                 name: "CompetenceLevels");
 
             migrationBuilder.DropTable(
+                name: "HistoryObjectiveColumnValuesFis");
+
+            migrationBuilder.DropTable(
                 name: "HistoryObjectiveColumnValuesFos");
 
             migrationBuilder.DropTable(
@@ -743,6 +844,9 @@ namespace EvaluationService.Migrations
 
             migrationBuilder.DropTable(
                 name: "HistoryUserCompetenceMPs");
+
+            migrationBuilder.DropTable(
+                name: "HistoryUserHelpContents");
 
             migrationBuilder.DropTable(
                 name: "HistoryUserIndicatorFOs");
@@ -767,6 +871,9 @@ namespace EvaluationService.Migrations
 
             migrationBuilder.DropTable(
                 name: "Levels");
+
+            migrationBuilder.DropTable(
+                name: "HistoryCFis");
 
             migrationBuilder.DropTable(
                 name: "HistoryCFos");

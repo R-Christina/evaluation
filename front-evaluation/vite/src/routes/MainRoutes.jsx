@@ -46,10 +46,17 @@ const AllEvaluationCadre = Loadable(lazy(() => import('views/collaborateur/archi
 const AllEvaluationNonCadre = Loadable(lazy(() => import('views/collaborateur/archive/allEvaluation/nonCadre/AllNonCadre')));
 const AllCadreYear = Loadable(lazy(() => import('views/collaborateur/archive/allEvaluation/cadre/AllCadreYear')));
 const AllNonCadreYear = Loadable(lazy(() => import('views/collaborateur/archive/allEvaluation/nonCadre/AllNonCadreYear')));
+const AllCadreArchive = Loadable(lazy(() => import('views/collaborateur/archive/allEvaluation/cadre/AllCadreArchive')));
+const AllNonCadreArchive = Loadable(lazy(() => import('views/collaborateur/archive/allEvaluation/nonCadre/AllNonCadreArchive')));
 
 const MyEvaluation = Loadable(lazy(() => import('views/collaborateur/archive/MyEvaluation')));
 const EvaluationPhasesCadre = Loadable(lazy(() => import('views/collaborateur/archive/cadre/EvaluationPhasesCadre')));
 const EvaluationPhasesNonCadre = Loadable(lazy(() => import('views/collaborateur/archive/nonCadre/EvaluationPhasesNonCadre')));
+
+//stat
+const IndexCadre = Loadable(lazy(() => import('views/collaborateur/stat/cadre/index')));
+const IndexNonCadre = Loadable(lazy(() => import('views/collaborateur/stat/nonCadre/index')));
+
 
 //manager
 const ListeSubordonne = Loadable(lazy(() => import('views/collaborateur/manager/Subordonne')));
@@ -339,6 +346,24 @@ const MainRoutes = {
       ]
     },
     {
+      path: 'allEvaluation',
+      children: [
+        {
+          path: 'cadreArchive/:userId/:evalId',
+          element: <AllCadreArchive />
+        }
+      ]
+    },
+    {
+      path: 'allEvaluation',
+      children: [
+        {
+          path: 'nonCadreArchive/:userId/:evalId',
+          element: <AllNonCadreArchive />
+        }
+      ]
+    },
+    {
       path: 'archive',
       children: [
         {
@@ -364,7 +389,28 @@ const MainRoutes = {
           element: <EvaluationPhasesNonCadre />
         }
       ]
+    },
+
+    //stat
+    {
+      path: 'stat',
+      children: [
+        {
+          path: 'cadre/index/:userId/:typeUser',
+          element: <IndexCadre />
+        }
+      ]
+    },
+    {
+      path: 'stat',
+      children: [
+        {
+          path: 'nonCadre/index/:userId/:typeUser',
+          element: <IndexNonCadre />
+        }
+      ]
     }
+
 
     // {
     //   path: 'utils',

@@ -16,7 +16,7 @@ namespace EvaluationService.Models
         [StringLength(255)]
         public string Name { get; set; }
 
-        public string? ResultText { get; set; }
+        public string ResultText { get; set; }
 
         public decimal? Result { get; set; }
 

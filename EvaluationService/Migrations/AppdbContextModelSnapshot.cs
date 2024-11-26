@@ -191,6 +191,51 @@ namespace EvaluationService.Migrations
                     b.ToTable("Helps");
                 });
 
+            modelBuilder.Entity("EvaluationService.Models.HistoryCFi", b =>
+                {
+                    b.Property<int>("HcfiId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("HcfiId"));
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("PriorityName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<decimal>("Result")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ResultIndicator")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserEvalId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ValidatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("Weighting")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("HcfiId");
+
+                    b.HasIndex("UserEvalId");
+
+                    b.ToTable("HistoryCFis");
+                });
+
             modelBuilder.Entity("EvaluationService.Models.HistoryCFo", b =>
                 {
                     b.Property<int>("HcfId")
@@ -272,6 +317,39 @@ namespace EvaluationService.Migrations
                     b.HasIndex("UserEvalId");
 
                     b.ToTable("HistoryCMps");
+                });
+
+            modelBuilder.Entity("EvaluationService.Models.HistoryObjectiveColumnValuesFi", b =>
+                {
+                    b.Property<int>("HistValueId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("HistValueId"));
+
+                    b.Property<string>("ColumnName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("HcfiId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ValidatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("HistValueId");
+
+                    b.HasIndex("HcfiId");
+
+                    b.ToTable("HistoryObjectiveColumnValuesFis");
                 });
 
             modelBuilder.Entity("EvaluationService.Models.HistoryObjectiveColumnValuesFo", b =>
@@ -449,6 +527,7 @@ namespace EvaluationService.Migrations
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("ResultText")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("UserEvalId")
@@ -879,6 +958,17 @@ namespace EvaluationService.Migrations
                     b.Navigation("Template");
                 });
 
+            modelBuilder.Entity("EvaluationService.Models.HistoryCFi", b =>
+                {
+                    b.HasOne("EvaluationService.Models.UserEvaluation", "UserEvaluation")
+                        .WithMany()
+                        .HasForeignKey("UserEvalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("UserEvaluation");
+                });
+
             modelBuilder.Entity("EvaluationService.Models.HistoryCFo", b =>
                 {
                     b.HasOne("EvaluationService.Models.UserEvaluation", "UserEvaluation")
@@ -899,6 +989,17 @@ namespace EvaluationService.Migrations
                         .IsRequired();
 
                     b.Navigation("UserEvaluation");
+                });
+
+            modelBuilder.Entity("EvaluationService.Models.HistoryObjectiveColumnValuesFi", b =>
+                {
+                    b.HasOne("EvaluationService.Models.HistoryCFi", "HistoryCFi")
+                        .WithMany()
+                        .HasForeignKey("HcfiId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("HistoryCFi");
                 });
 
             modelBuilder.Entity("EvaluationService.Models.HistoryObjectiveColumnValuesFo", b =>

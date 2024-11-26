@@ -31,8 +31,10 @@ namespace EvaluationService.Data
         //history cadre
         public DbSet<HistoryCFo> HistoryCFos { get; set; }
         public DbSet<HistoryCMp> HistoryCMps { get; set; }
+        public DbSet<HistoryCFi> HistoryCFis { get; set; }
         public DbSet<HistoryObjectiveColumnValuesFo> HistoryObjectiveColumnValuesFos { get; set; }
         public DbSet<HistoryObjectiveColumnValuesMp> HistoryObjectiveColumnValuesMps { get; set; }
+        public DbSet<HistoryObjectiveColumnValuesFi> HistoryObjectiveColumnValuesFis { get; set; }
 
         //history Non cadre
         public DbSet<HistoryUserCompetenceFO> HistoryUserCompetenceFOs { get; set; }

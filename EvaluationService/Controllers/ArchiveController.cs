@@ -44,6 +44,97 @@ namespace EvaluationService.Controllers
         }
 
 
+        // [HttpGet("historyCadre/{userId}/{evalId}/{phase}")]
+        // public IActionResult GetEvaluationHistoryByPhase(string userId, int evalId, string phase)
+        // {
+        //     if (phase == "Fixation")
+        //     {
+        //         var fixationHistory = _context.HistoryCFos
+        //             .Join(_context.UserEvaluations,
+        //                 hcf => hcf.UserEvalId,
+        //                 ue => ue.UserEvalId,
+        //                 (hcf, ue) => new { hcf, ue })
+        //             .Join(_context.Evaluations,
+        //                 combined => combined.ue.EvalId,
+        //                 e => e.EvalId,
+        //                 (combined, e) => new { combined.hcf, combined.ue, e })
+        //             .Where(result => result.ue.UserId == userId && result.e.EvalId == evalId && result.e.Type == "Cadre")
+        //             .Select(result => new
+        //             {
+        //                 Phase = "Fixation",
+        //                 HistoryId = result.hcf.HcfId,
+        //                 result.hcf.PriorityName,
+        //                 result.hcf.Description,
+        //                 result.hcf.Weighting,
+        //                 Date = result.hcf.CreatedAt,
+        //                 EvaluationYear = result.e.EvalAnnee,
+        //                 ResultIndicator = (string)null,
+        //                 Result = (string)null,
+        //                 ColumnValues = _context.HistoryObjectiveColumnValuesFos
+        //                     .Where(hcv => hcv.HcfId == result.hcf.HcfId)
+        //                     .Select(hcv => new
+        //                     {
+        //                         hcv.ColumnName,
+        //                         hcv.Value
+        //                     })
+        //                     .ToList()
+        //             })
+        //             .ToList();
+
+        //         if (fixationHistory == null || !fixationHistory.Any())
+        //         {
+        //             return NotFound(new { message = "No fixation history found for the specified user and evaluation." });
+        //         }
+
+        //         return Ok(fixationHistory);
+        //     }
+        //     else if (phase == "Mi-Parcours")
+        //     {
+        //         var miParcoursHistory = _context.HistoryCMps
+        //             .Join(_context.UserEvaluations,
+        //                 hcm => hcm.UserEvalId,
+        //                 ue => ue.UserEvalId,
+        //                 (hcm, ue) => new { hcm, ue })
+        //             .Join(_context.Evaluations,
+        //                 combined => combined.ue.EvalId,
+        //                 e => e.EvalId,
+        //                 (combined, e) => new { combined.hcm, combined.ue, e })
+        //             .Where(result => result.ue.UserId == userId && result.e.EvalId == evalId && result.e.Type == "Cadre")
+        //             .Select(result => new
+        //             {
+        //                 Phase = "Mi-Parcours",
+        //                 HistoryId = result.hcm.HcmId,
+        //                 result.hcm.PriorityName,
+        //                 result.hcm.Description,
+        //                 result.hcm.Weighting,
+        //                 Date = result.hcm.UpdatedAt,
+        //                 EvaluationYear = result.e.EvalAnnee,
+        //                 result.hcm.ResultIndicator,
+        //                 result.hcm.Result,
+        //                 ColumnValues = _context.HistoryObjectiveColumnValuesMps
+        //                     .Where(hcv => hcv.HcmId == result.hcm.HcmId)
+        //                     .Select(hcv => new
+        //                     {
+        //                         hcv.ColumnName,
+        //                         hcv.Value
+        //                     })
+        //                     .ToList()
+        //             })
+        //             .ToList();
+
+        //         if (miParcoursHistory == null || !miParcoursHistory.Any())
+        //         {
+        //             return NotFound(new { message = "No mi-parcours history found for the specified user and evaluation." });
+        //         }
+
+        //         return Ok(miParcoursHistory);
+        //     }
+        //     else
+        //     {
+        //         return BadRequest(new { message = "Invalid phase specified. Please specify either 'Fixation' or 'Mi-Parcours'." });
+        //     }
+        // }
+
         [HttpGet("historyCadre/{userId}/{evalId}/{phase}")]
         public IActionResult GetEvaluationHistoryByPhase(string userId, int evalId, string phase)
         {
@@ -129,11 +220,53 @@ namespace EvaluationService.Controllers
 
                 return Ok(miParcoursHistory);
             }
+            else if (phase == "Évaluation Finale")
+            {
+                var evaluationFinaleHistory = _context.HistoryCFis
+                    .Join(_context.UserEvaluations,
+                        hcf => hcf.UserEvalId,
+                        ue => ue.UserEvalId,
+                        (hcf, ue) => new { hcf, ue })
+                    .Join(_context.Evaluations,
+                        combined => combined.ue.EvalId,
+                        e => e.EvalId,
+                        (combined, e) => new { combined.hcf, combined.ue, e })
+                    .Where(result => result.ue.UserId == userId && result.e.EvalId == evalId && result.e.Type == "Cadre")
+                    .Select(result => new
+                    {
+                        Phase = "Évaluation Finale",
+                        HistoryId = result.hcf.HcfiId,
+                        result.hcf.PriorityName,
+                        result.hcf.Description,
+                        result.hcf.Weighting,
+                        Date = result.hcf.UpdatedAt, // Assurez-vous que c'est le bon champ pour la date
+                        EvaluationYear = result.e.EvalAnnee,
+                        result.hcf.ResultIndicator,
+                        result.hcf.Result,
+                        ColumnValues = _context.HistoryObjectiveColumnValuesFis
+                            .Where(hcv => hcv.HcfiId == result.hcf.HcfiId)
+                            .Select(hcv => new
+                            {
+                                hcv.ColumnName,
+                                hcv.Value
+                            })
+                            .ToList()
+                    })
+                    .ToList();
+
+                if (evaluationFinaleHistory == null || !evaluationFinaleHistory.Any())
+                {
+                    return NotFound(new { message = "No 'Évaluation Finale' history found for the specified user and evaluation." });
+                }
+
+                return Ok(evaluationFinaleHistory);
+            }
             else
             {
-                return BadRequest(new { message = "Invalid phase specified. Please specify either 'Fixation' or 'Mi-Parcours'." });
+                return BadRequest(new { message = "Invalid phase specified. Please specify either 'Fixation', 'Mi-Parcours', or 'Évaluation Finale'." });
             }
         }
+
 
         private async Task<int?> GetUserEvalIdAsync(int evalId, string userId)
         {
@@ -178,43 +311,110 @@ namespace EvaluationService.Controllers
             });
         }
 
-        [HttpGet("priority/totalWeightingAndResult/{evalId}/{userId}")]
-        public async Task<IActionResult> GetTotalWeightingAndResultByPriority(int evalId, string userId)
-        {
-            var userEvalId = await GetUserEvalIdAsync(evalId, userId);
-            if (userEvalId == null)
+        // [HttpGet("priority/totalWeightingAndResult/{evalId}/{userId}")]
+        // public async Task<IActionResult> GetTotalWeightingAndResultByPriority(int evalId, string userId)
+        // {
+        //     var userEvalId = await GetUserEvalIdAsync(evalId, userId);
+        //     if (userEvalId == null)
+        //     {
+        //         return NotFound(new { message = "User evaluation not found." });
+        //     }
+
+        //     var totalWeightingAndResults = _context.HistoryCMps
+        //         .Where(h => h.UserEvalId == userEvalId)
+        //         .GroupBy(h => h.PriorityName)
+        //         .Select(g => new
+        //         {
+        //             PriorityName = g.Key,
+        //             TotalWeighting = Math.Truncate(g.Sum(h => h.Weighting) * 100) / 100,
+        //             TotalResult = Math.Truncate(g.Sum(h => (h.Weighting * h.Result) / 100) * 100) / 100
+        //         })
+        //         .ToList();
+
+        //     if (totalWeightingAndResults == null || !totalWeightingAndResults.Any())
+        //     {
+        //         return NotFound(new { message = "No data found for the specified priorities." });
+        //     }
+
+        //     var totalWeightingSum = totalWeightingAndResults.Sum(g => g.TotalWeighting);
+        //     var totalResultSum = totalWeightingAndResults.Sum(g => g.TotalResult);
+
+        //     return Ok(new
+        //     {
+        //         TotalWeightingAndResults = totalWeightingAndResults,
+        //         TotalWeightingSum = totalWeightingSum,
+        //         TotalResultSum = totalResultSum
+        //     });
+        // }
+
+        [HttpGet("priority/totalWeightingAndResult/{evalId}/{userId}/{phase}")]
+public async Task<IActionResult> GetTotalWeightingAndResultByPriority(int evalId, string userId, string phase)
+{
+    var userEvalId = await GetUserEvalIdAsync(evalId, userId);
+    if (userEvalId == null)
+    {
+        return NotFound(new { message = "User evaluation not found." });
+    }
+
+    // Initialiser la requête en fonction de la phase
+    IQueryable<HistoryDto> historyQuery;
+
+    if (phase.Equals("Mi-Parcours", StringComparison.OrdinalIgnoreCase))
+    {
+        historyQuery = _context.HistoryCMps
+            .Where(h => h.UserEvalId == userEvalId)
+            .Select(h => new HistoryDto
             {
-                return NotFound(new { message = "User evaluation not found." });
-            }
-
-            var totalWeightingAndResults = _context.HistoryCMps
-                .Where(h => h.UserEvalId == userEvalId)
-                .GroupBy(h => h.PriorityName)
-                .Select(g => new
-                {
-                    PriorityName = g.Key,
-                    TotalWeighting = Math.Truncate(g.Sum(h => h.Weighting) * 100) / 100,
-                    TotalResult = Math.Truncate(g.Sum(h => (h.Weighting * h.Result) / 100) * 100) / 100
-                })
-                .ToList();
-
-            if (totalWeightingAndResults == null || !totalWeightingAndResults.Any())
-            {
-                return NotFound(new { message = "No data found for the specified priorities." });
-            }
-
-            var totalWeightingSum = totalWeightingAndResults.Sum(g => g.TotalWeighting);
-            var totalResultSum = totalWeightingAndResults.Sum(g => g.TotalResult);
-
-            return Ok(new
-            {
-                TotalWeightingAndResults = totalWeightingAndResults,
-                TotalWeightingSum = totalWeightingSum,
-                TotalResultSum = totalResultSum
+                PriorityName = h.PriorityName,
+                Weighting = h.Weighting,
+                Result = h.Result
             });
-        }
+    }
+    else if (phase.Equals("Évaluation Finale", StringComparison.OrdinalIgnoreCase))
+    {
+        historyQuery = _context.HistoryCFis
+            .Where(h => h.UserEvalId == userEvalId)
+            .Select(h => new HistoryDto
+            {
+                PriorityName = h.PriorityName,
+                Weighting = h.Weighting,
+                Result = h.Result
+            });
+    }
+    else
+    {
+        return BadRequest(new { message = "Phase invalide. Utilisez 'Mi-Parcours' ou 'Évaluation Finale'." });
+    }
 
-        //------------------------------------------------------------------NonCadre---------------------------------------------------------------
+    var totalWeightingAndResults = await historyQuery
+        .GroupBy(h => h.PriorityName)
+        .Select(g => new
+        {
+            PriorityName = g.Key,
+            TotalWeighting = Math.Truncate(g.Sum(h => h.Weighting) * 100) / 100,
+            TotalResult = Math.Truncate(g.Sum(h => (h.Weighting * h.Result) / 100) * 100) / 100
+        })
+        .ToListAsync();
+
+    if (totalWeightingAndResults == null || !totalWeightingAndResults.Any())
+    {
+        return NotFound(new { message = "No data found for the specified priorities." });
+    }
+
+    var totalWeightingSum = totalWeightingAndResults.Sum(g => g.TotalWeighting);
+    var totalResultSum = totalWeightingAndResults.Sum(g => g.TotalResult);
+
+    return Ok(new
+    {
+        TotalWeightingAndResults = totalWeightingAndResults,
+        TotalWeightingSum = totalWeightingSum,
+        TotalResultSum = totalResultSum
+    });
+}
+
+
+//------------------------------------------------------------------NonCadre---------------------------------------------------------------
+
 
         private Evaluation GetEvaluation(int evalId)
         {
@@ -617,5 +817,12 @@ namespace EvaluationService.Controllers
         public string ResultText { get; set; }
         public decimal Result { get; set; }
         public int EvaluationYear { get; set; }
+    }
+
+    public class HistoryDto
+    {
+        public string PriorityName { get; set; }
+        public decimal Weighting { get; set; }
+        public decimal Result { get; set; }
     }
 }

@@ -17,19 +17,22 @@ import {
 } from '@mui/material';
 import FolderIcon from '@mui/icons-material/Folder';
 import MainCard from 'ui-component/cards/MainCard';
-import { formulaireInstance } from '../../../../axiosConfig';
+import { authInstance, formulaireInstance } from '../../../../../axiosConfig';
 import { useParams } from 'react-router-dom';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-function EvaluationPhasesCadre() {
+function AllCadreArchive() {
   const { userId, evalId } = useParams();
   const [historyByPhase, setHistoryByPhase] = useState([]);
   const [activePhase, setActivePhase] = useState('Fixation');
   const [evaluationDetails, setEvaluationDetails] = useState(null);
   const [totalWeightingSum, setTotalWeightingSum] = useState(0);
   const [totalResultSum, setTotalResultSum] = useState(0);
+  const [isContentVisible, setIsContentVisible] = useState(true);
+
+  const [userDetails, setUserDetails] = useState(null);
 
   const printRef = useRef();
 
@@ -55,9 +58,10 @@ function EvaluationPhasesCadre() {
 
   const fetchUserDetails = async () => {
     try {
-      const response = await formulaireInstance.get(`/User/user/${userId}`); // Remplacer par le bon endpoint
+      const response = await authInstance.get(`/User/user/${userId}`); // Remplacer par le bon endpoint
       if (response && response.data) {
         setUserDetails(response.data); // Mettre à jour les détails utilisateur
+        console.log(response.data);
       } else {
         console.error('Unexpected response structure:', response);
       }
@@ -91,9 +95,9 @@ function EvaluationPhasesCadre() {
     }
   };
 
-  const fetchTotalWeightingAndResult = async () => {
+  const fetchTotalWeightingAndResult = async (phase) => {
     try {
-      const response = await formulaireInstance.get(`/archive/priority/totalWeightingAndResult/${evalId}/${userId}`);
+      const response = await formulaireInstance.get(`/archive/priority/totalWeightingAndResult/${evalId}/${userId}/${phase}`);
       if (response && response.data) {
         setTotalWeightingSum(response.data.totalWeightingSum);
         setTotalResultSum(response.data.totalResultSum);
@@ -119,21 +123,25 @@ function EvaluationPhasesCadre() {
 
   const handlePhaseClick = async (phase) => {
     setActivePhase(phase);
-    try {
-      const response = await formulaireInstance.get(`/archive/historyCadre/${userId}/${evalId}/${phase}`);
-      if (response && response.data) {
-        setHistoryByPhase(response.data);
-        if (phase === 'Fixation') {
-          fetchTotalWeighting();
-        } else if (phase === 'Mi-Parcours') {
-          fetchTotalWeightingAndResult();
+    setIsContentVisible(false); // Déclencher l'animation de sortie
+
+    setTimeout(async () => {
+      try {
+        const response = await formulaireInstance.get(`/archive/historyCadre/${userId}/${evalId}/${phase}`);
+        if (response && response.data) {
+          setHistoryByPhase(response.data);
+          if (phase === 'Fixation') {
+            await fetchTotalWeighting();
+          } else if (phase === 'Mi-Parcours' || phase === 'Évaluation Finale') {
+            await fetchTotalWeightingAndResult(phase);
+          }
         }
-      } else {
-        console.error('Unexpected response structure:', response);
+      } catch (error) {
+        console.error("Erreur lors de la récupération de l'historique de la phase:", error);
+      } finally {
+        setIsContentVisible(true); // Déclencher l'animation d'entrée
       }
-    } catch (error) {
-      console.error('Error fetching phase history:', error);
-    }
+    }, 400); // Synchronisé avec la transition CSS
   };
 
   const groupedData = historyByPhase.reduce((acc, curr) => {
@@ -190,7 +198,7 @@ function EvaluationPhasesCadre() {
         </Grid>
 
         <Grid container spacing={3}>
-          {['Fixation', 'Mi-Parcours'].map((phase) => (
+          {['Fixation', 'Mi-Parcours', 'Évaluation Finale'].map((phase) => (
             <Grid item xs={12} sm={6} md={4} key={phase}>
               <Card
                 sx={{
@@ -214,7 +222,16 @@ function EvaluationPhasesCadre() {
           ))}
         </Grid>
 
-        <Box sx={{ padding: 2 }} ref={printRef}>
+        <Box
+          sx={{
+            padding: 2,
+            opacity: isContentVisible ? 1 : 0,
+            transform: isContentVisible ? 'translateY(0)' : 'translateY(10px)',
+            transition: 'opacity 0.5s ease, transform 0.5s ease', // Synchronisé avec setTimeout
+            willChange: 'opacity, transform'
+          }}
+          ref={printRef}
+        >
           {evaluationDetails && (
             <Typography variant="h4" align="center" sx={{ backgroundColor: '#d4edda', padding: 1, fontWeight: 'bold', mt: 2 }}>
               {evaluationDetails.titre}
@@ -229,14 +246,14 @@ function EvaluationPhasesCadre() {
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
                 <Typography variant="body1">
-                  Nom : <span style={{ color: '#3949AB' }}>{userNon}</span>
+                  Nom : <span style={{ color: '#3949AB' }}>{userDetails?.name || 'N/A'}</span>
                 </Typography>
                 <Typography variant="body1">Matricule :</Typography>
                 <Typography variant="body1">
-                  Poste : <span style={{ color: '#3949AB' }}>{poste}</span>
+                  Poste : <span style={{ color: '#3949AB' }}>{userDetails?.poste || 'N/A'}</span>
                 </Typography>
                 <Typography variant="body1">
-                  Département : <span style={{ color: '#3949AB' }}>{departement}</span>
+                  Département : <span style={{ color: '#3949AB' }}>{userDetails?.department || 'N/A'}</span>
                 </Typography>
               </Paper>
             </Grid>
@@ -247,7 +264,7 @@ function EvaluationPhasesCadre() {
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
                 <Typography variant="body1">
-                  Nom : <span style={{ color: '#3949AB' }}>{superiorName}</span>
+                  Nom : <span style={{ color: '#3949AB' }}>{userDetails?.superiorName || 'N/A'}</span>
                 </Typography>
               </Paper>
             </Grid>
@@ -266,11 +283,12 @@ function EvaluationPhasesCadre() {
                     INDICATEURS DE RÉSULTAT
                   </TableCell>
                   <TableCell sx={{ backgroundColor: '#3f51b5', color: 'white' }}>RÉSULTATS en % d’atteinte sur 100%</TableCell>
-                  {columnNames.map((columnName, index) => (
-                    <TableCell key={index} sx={{ backgroundColor: '#DFEDFF', color: 'black' }}>
-                      {columnName}
-                    </TableCell>
-                  ))}
+                  {columnNames?.length > 0 &&
+                    columnNames.map((columnName) => (
+                      <TableCell key={columnName} sx={{ backgroundColor: '#DFEDFF', color: 'black' }}>
+                        {columnName}
+                      </TableCell>
+                    ))}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -301,15 +319,13 @@ function EvaluationPhasesCadre() {
                         <TableCell sx={{ borderRight: '1px solid #ddd' }}>
                           {objective.result && objective.result !== 0 ? `${objective.result}%` : ' '}
                         </TableCell>
-                          {objective.columnValues && objective.columnValues.length > 0 ? (
-                            objective.columnValues.map((column, index) => (
-                              <TableCell key={index} sx={{ borderRight: '1px solid #ddd' }}>
-                                {column.value !== "N/A" ? column.value : ""}
-                              </TableCell>
-                            ))
-                          ) : (
-                            <TableCell sx={{ borderRight: '1px solid #ddd' }}>Aucune donnée</TableCell>
-                          )}
+                        {objective.columnValues &&
+                          objective.columnValues.length > 0 &&
+                          objective.columnValues.map((column) => (
+                            <TableCell key={column.columnName} sx={{ borderRight: '1px solid #ddd' }}>
+                              {column.value !== 'N/A' ? column.value : ''}
+                            </TableCell>
+                          ))}
                       </TableRow>
                     ))}
                     <TableRow sx={{ backgroundColor: '#e8f5e9' }}>
@@ -379,4 +395,4 @@ function EvaluationPhasesCadre() {
   );
 }
 
-export default EvaluationPhasesCadre;
+export default AllCadreArchive;

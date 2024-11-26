@@ -202,7 +202,15 @@ const Subordonne = () => {
                           variant="outlined"
                           size="small"
                           sx={{ textTransform: 'none', flexGrow: 1 }}
-                          onClick={() => console.log('Statistique clicked')}
+                          onClick={() => {
+                            if (subordinate.typeUser === 'Cadre') {
+                              navigate(`/stat/cadre/index/${subordinate.id}/${subordinate.typeUser}`);
+                            } else if (subordinate.typeUser === 'NonCadre') {
+                              navigate(`/stat/nonCadre/index/${subordinate.id}/${subordinate.typeUser}`);
+                            } else {
+                              console.error('Invalid user type:', subordinate.typeUser);
+                            }
+                          }}
                         >
                           Statistique
                         </Button>
@@ -231,7 +239,15 @@ const Subordonne = () => {
                               backgroundColor: '#FFCCBC'
                             }
                           }}
-                          onClick={() => navigate(`/allEvaluation/cadreYear/${subordinate.id}/${subordinate.typeUser}`)}
+                          onClick={() => {
+                            if (subordinate.typeUser === 'Cadre') {
+                              navigate(`/allEvaluation/cadreYear/${subordinate.id}/${subordinate.typeUser}`);
+                            } else if (subordinate.typeUser === 'NonCadre') {
+                              navigate(`/allEvaluation/nonCadreYear/${subordinate.id}/${subordinate.typeUser}`);
+                            } else {
+                              console.error('Invalid user type:', subordinate.typeUser);
+                            }
+                          }}
                         >
                           Archive
                         </Button>

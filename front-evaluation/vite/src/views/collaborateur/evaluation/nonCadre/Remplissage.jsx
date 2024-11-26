@@ -42,6 +42,8 @@ const Remplissage = () => {
 
   // Nouvel état pour suivre si le formulaire a été validé
   const [isValidated, setIsValidated] = useState(false);
+  //etat si les desultat sont disponible
+  const [isResultDispo, setIsResultDispo] = useState(false);
 
   // États pour Mi-Parcours
   const [competences, setCompetences] = useState([]);
@@ -150,23 +152,33 @@ const Remplissage = () => {
         setLoading(true);
         setErrorMessage(null);
         setSuccessMessage(null);
-
+  
         try {
           const [competencesResponse, indicatorsResponse] = await Promise.all([
             formulaireInstance.get(`/Evaluation/${evalId}/competences/${userId}`),
-            formulaireInstance.get(`/Evaluation/${evalId}/indicators/${userId}`)
+            formulaireInstance.get(`/Evaluation/${evalId}/indicators/${userId}`),
           ]);
-
+  
           // Si les requêtes aboutissent, mettez à jour les états
-          setCompetences(Array.isArray(competencesResponse.data) ? competencesResponse.data : []);
-          setIndicators(Array.isArray(indicatorsResponse.data) ? indicatorsResponse.data : []);
+          const competences = Array.isArray(competencesResponse.data) ? competencesResponse.data : [];
+          const indicators = Array.isArray(indicatorsResponse.data) ? indicatorsResponse.data : [];
+  
+          setCompetences(competences);
+          setIndicators(indicators);
+  
+          // Vérifiez si les deux contiennent des données
+          if (competences.length > 0 && indicators.length > 0) {
+            setIsResultDispo(true);
+          } else {
+            setIsResultDispo(false);
+          }
         } catch (error) {
           if (error.response?.status === 404) {
-            // Gère les erreurs 404 avec un message personnalisé
-            setErrorMessage("Votre manager n'a pas encore valider vos résultats");
+            setIsResultDispo(false);
           } else {
             // Pour toutes les autres erreurs, affiche le message générique ou celui du backend
-            const backendErrorMessage = error.response?.data?.Message || 'Erreur lors de la récupération des données Mi-Parcours.';
+            const backendErrorMessage =
+              error.response?.data?.Message || 'Erreur lors de la récupération des données Mi-Parcours.';
             setErrorMessage(backendErrorMessage);
           }
         } finally {
@@ -174,9 +186,9 @@ const Remplissage = () => {
         }
       }
     };
-
+  
     fetchMiParcoursData();
-  }, [currentPeriod, evalId, userId]);
+  }, [currentPeriod, evalId, userId]);  
 
   const handleIndicatorLabelChange = (indicatorId, value) => {
     setIndicatorValues((prev) => ({
@@ -200,7 +212,6 @@ const Remplissage = () => {
         indicatorId: indicator.indicatorId,
         indicatorName: indValue.label || indicator.name || 'N/A',
         results: [
-          // Encapsuler resultText et result dans un tableau "results"
           {
             resultText: 'N/A', // Vous pouvez remplacer 'N/A' par la valeur appropriée si nécessaire
             result: 0 // Vous pouvez remplacer 0 par la valeur appropriée si nécessaire
@@ -459,7 +470,12 @@ const Remplissage = () => {
               </Box>
             ) : (
               <Box>
-                {isValidated ? (
+                {/* Message d'information */}
+                {!isResultDispo ? (
+                  <Alert severity="info" sx={{ mt: 5, mb: 3 }}>
+                    Votre manager n'a pas encore validé vos résultats.
+                  </Alert>
+                ) : isValidated ? (
                   <Alert severity="info" sx={{ mt: 5, mb: 3 }}>
                     Vous avez déjà validé ce formulaire.
                   </Alert>
@@ -638,7 +654,7 @@ const Remplissage = () => {
           </>
         )}
 
-        {currentPeriod === 'Évaluation Finale' && helps.length > 0 && (
+        {currentPeriod === 'Évaluation Finale' && (
           <MainCard sx={{ mt: 3, p: 2, backgroundColor: '#E8F5E9' }}>
             <Typography variant="h5" sx={{ color: '#2E7D32', mb: 2 }}>
               Aides Disponibles
@@ -665,14 +681,14 @@ const Remplissage = () => {
               ))}
             </Box>
             <Box display="flex" justifyContent="center" mt={3}>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={handleSaveHelps}
-                    disabled={helps.some((help) => !help.content || help.content.trim() === '')} // Désactiver si un champ est vide
-                  >
-                    Valider
-                  </Button>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleSaveHelps}
+                disabled={helps.some((help) => !help.content || help.content.trim() === '')} // Désactiver si un champ est vide
+              >
+                Valider
+              </Button>
             </Box>
           </MainCard>
         )}
