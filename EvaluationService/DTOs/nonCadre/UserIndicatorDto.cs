@@ -7,6 +7,6 @@ namespace EvaluationService.DTOs
         public int IndicatorId { get; set; }
         public string IndicatorName { get; set; }
         public string ResultText { get; set; }
-        public double Result { get; set; }
+        public decimal Result { get; set; }
     }
 }

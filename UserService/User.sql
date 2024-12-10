@@ -18,13 +18,14 @@ CREATE TABLE [Habilitations] (
 );
 GO
 
-CREATE TABLE [Sections] (
-    [Id] int NOT NULL IDENTITY,
-    [Name] nvarchar(max) NOT NULL,
-    CONSTRAINT [PK_Sections] PRIMARY KEY ([Id])
-);
-GO
-insert into [Sections] ([Name]) values ('Fiche d''évaluation'),('Archives');
+INSERT INTO [Sections] ([Name]) 
+VALUES
+    ('Gestion des habilitations'),
+    ('Gestion des utilisateurs'),
+    ('Gestion des formulaires d''évaluation'),
+    ('Gestion des périodes d''évaluation'),
+    ('Gestion des évaluations'),
+    ('Gestion des archives');
 
 CREATE TABLE [Users] (
     [Id] nvarchar(450) NOT NULL,
@@ -49,6 +50,109 @@ CREATE TABLE [HabilitationAdmins] (
     CONSTRAINT [FK_HabilitationAdmins_Sections_SectionId] FOREIGN KEY ([SectionId]) REFERENCES [Sections] ([Id]) ON DELETE CASCADE
 );
 GO
+
+-- Gestion des habilitations
+INSERT INTO [HabilitationAdmins] ([Name], [SectionId], [IsGranted])
+VALUES
+    ('Consulter les habilitations', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des habilitations'), 
+        1),
+    ('Ajouter une habilitation', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des habilitations'), 
+        1),
+    ('Modifier une habilitation', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des habilitations'), 
+        1),
+    ('Supprimer une habilitation', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des habilitations'), 
+        1),
+    ('Assigner des habilitations', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des habilitations'), 
+        1);
+
+-- Gestion des utilisateurs
+INSERT INTO [HabilitationAdmins] ([Name], [SectionId], [IsGranted])
+VALUES
+    ('Consulter la liste des utilisateurs', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des utilisateurs'), 
+        1),
+    ('Mettre à jour les informations des utilisateurs', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des utilisateurs'), 
+        1),
+    ('Classifier les utilisateurs', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des utilisateurs'), 
+        1);
+
+-- Gestion des formulaires d'évaluation
+INSERT INTO [HabilitationAdmins] ([Name], [SectionId], [IsGranted])
+VALUES
+    ('Consulter les formulaires vierges d''évaluation', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des formulaires d''évaluation'), 
+        1),
+    ('Modifier les formulaires d''évaluation existants', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des formulaires d''évaluation'), 
+        1);
+
+-- Gestion des périodes d'évaluation
+INSERT INTO [HabilitationAdmins] ([Name], [SectionId], [IsGranted])
+VALUES
+    ('Consulter les périodes d''évaluation', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des périodes d''évaluation'), 
+        1),
+    ('Créer une nouvelle période d''évaluation', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des périodes d''évaluation'), 
+        1),
+    ('Modifier une période d''évaluation', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des périodes d''évaluation'), 
+        1);
+
+-- Gestion des évaluations
+INSERT INTO [HabilitationAdmins] ([Name], [SectionId], [IsGranted])
+VALUES
+    ('Consulter les subordonnés', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des évaluations'), 
+        1),
+    ('Remplir ses formulaires d''évaluation pour un cadre', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des évaluations'), 
+        1),
+    ('Remplir les formulaires d''évaluation pour ses subordonnés cadres', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des évaluations'), 
+        1),
+    ('Consulter les formulaires en cours des collaborateurs cadres', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des évaluations'), 
+        1),
+    ('Consulter les formulaires en cours des subordonnés cadres', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des évaluations'), 
+        1),
+    ('Remplir ses formulaires d''évaluation pour un non-cadre', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des évaluations'), 
+        1),
+    ('Remplir les formulaires d''évaluation pour ses subordonnés non-cadres', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des évaluations'), 
+        1),
+    ('Consulter les formulaires en cours des collaborateurs non-cadres', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des évaluations'), 
+        1),
+    ('Consulter les formulaires en cours des subordonnés non-cadres', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des évaluations'), 
+        1);
+
+-- Gestion des archives
+INSERT INTO [HabilitationAdmins] ([Name], [SectionId], [IsGranted])
+VALUES
+    ('Consulter ses archives personnelles', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des archives'), 
+        1),
+    ('Consulter les archives de tous les collaborateurs', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des archives'), 
+        1),
+    ('Modifier les fiches archivées de tous les collaborateurs', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des archives'), 
+        1),
+    ('Consulter les archives des subordonnés', 
+        (SELECT [Id] FROM [Sections] WHERE [Name] = 'Gestion des archives'), 
+        1);
+
 
 CREATE TABLE [UserHabilitations] (
     [HabilitationsId] int NOT NULL,

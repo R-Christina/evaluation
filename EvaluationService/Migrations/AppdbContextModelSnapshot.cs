@@ -223,7 +223,6 @@ namespace EvaluationService.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("ValidatedBy")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("Weighting")
@@ -257,11 +256,18 @@ namespace EvaluationService.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
+                    b.Property<string>("ResultIndicator")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<decimal?>("Resultat")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<int>("UserEvalId")
                         .HasColumnType("int");
 
                     b.Property<string>("ValidatedBy")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("Weighting")
@@ -306,7 +312,6 @@ namespace EvaluationService.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("ValidatedBy")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("Weighting")
@@ -338,7 +343,6 @@ namespace EvaluationService.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("ValidatedBy")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Value")
@@ -371,7 +375,6 @@ namespace EvaluationService.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("ValidatedBy")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Value")
@@ -534,7 +537,6 @@ namespace EvaluationService.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("ValidatedBy")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("HistoryUserIndicatorFOId");
@@ -572,6 +574,42 @@ namespace EvaluationService.Migrations
                     b.HasIndex("UserEvalId");
 
                     b.ToTable("HistoryUserIndicatorMPs");
+                });
+
+            modelBuilder.Entity("EvaluationService.Models.HistoryUserindicatorFi", b =>
+                {
+                    b.Property<int>("HistoryUserindicatorFiId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("HistoryUserindicatorFiId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<decimal?>("Result")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ResultText")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("UserEvalId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ValidatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("HistoryUserindicatorFiId");
+
+                    b.HasIndex("UserEvalId");
+
+                    b.ToTable("HistoryUserindicatorFis");
                 });
 
             modelBuilder.Entity("EvaluationService.Models.Indicator", b =>
@@ -618,6 +656,41 @@ namespace EvaluationService.Migrations
                     b.HasKey("LevelId");
 
                     b.ToTable("Levels");
+                });
+
+            modelBuilder.Entity("EvaluationService.Models.Notification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SenderId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SenderMatricule")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("EvaluationService.Models.ObjectiveColumn", b =>
@@ -1058,6 +1131,17 @@ namespace EvaluationService.Migrations
                 });
 
             modelBuilder.Entity("EvaluationService.Models.HistoryUserIndicatorMP", b =>
+                {
+                    b.HasOne("EvaluationService.Models.UserEvaluation", "UserEvaluation")
+                        .WithMany()
+                        .HasForeignKey("UserEvalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("UserEvaluation");
+                });
+
+            modelBuilder.Entity("EvaluationService.Models.HistoryUserindicatorFi", b =>
                 {
                     b.HasOne("EvaluationService.Models.UserEvaluation", "UserEvaluation")
                         .WithMany()

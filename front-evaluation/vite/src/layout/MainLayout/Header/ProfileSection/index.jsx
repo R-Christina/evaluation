@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 // material-ui
 import Avatar from '@mui/material/Avatar';
@@ -31,7 +32,7 @@ import Transitions from 'ui-component/extended/Transitions';
 // assets
 import { IconLogout, IconSettings, IconUser } from '@tabler/icons-react';
 
-import { authInstance } from "axiosConfig";
+import { authInstance } from 'axiosConfig';
 // ==============================|| PROFILE MENU ||============================== //
 
 const ProfileSection = () => {
@@ -63,7 +64,6 @@ const ProfileSection = () => {
       console.error('Erreur lors de la déconnexion:', error);
     }
   };
-  
 
   const handleClose = (event) => {
     if (anchorRef.current && anchorRef.current.contains(event.target)) {
@@ -92,6 +92,12 @@ const ProfileSection = () => {
 
     prevOpen.current = open;
   }, [open]);
+
+  const handleNavigation = (event) => {
+    setSelectedIndex(1);
+    handleListItemClick(event, 1);
+    navigate('/collab/profile');
+  };
 
   return (
     <>
@@ -126,7 +132,6 @@ const ProfileSection = () => {
               color: theme.palette.primary.light
             }}
           >
-            {/* Remplacement de l'avatar par la première lettre */}
             {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
           </Avatar>
         }
@@ -162,78 +167,23 @@ const ProfileSection = () => {
               <ClickAwayListener onClickAway={handleClose}>
                 <MainCard border={false} elevation={16} content={false} boxShadow shadow={theme.shadows[16]}>
                   <Box sx={{ p: 2, pb: 0 }}>
-                  <Stack>
-                    <Typography variant="h4">Bonjour,</Typography>
-                    <Stack direction="row" spacing={0.5} alignItems="center">
-                      <Typography component="span" variant="h5" sx={{ fontWeight: 400 }} color={'Green'}>
-                        {user.name}
-                      </Typography>
+                    <Stack>
+                      <Typography variant="h4">Bonjour,</Typography>
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Typography component="span" variant="h5" sx={{ fontWeight: 400 }} color={'Green'}>
+                          {user.name}
+                        </Typography>
+                      </Stack>
                     </Stack>
-                  </Stack>
-
-                    {/* <OutlinedInput
-                      sx={{ width: '100%', pr: 1, pl: 2, my: 2 }}
-                      id="input-search-profile"
-                      value={value}
-                      onChange={(e) => setValue(e.target.value)}
-                      placeholder="Search profile options"
-                      startAdornment={
-                        <InputAdornment position="start">
-                          <IconSearch stroke={1.5} size="1rem" color={theme.palette.grey[500]} />
-                        </InputAdornment>
-                      }
-                      aria-describedby="search-helper-text"
-                      inputProps={{
-                        'aria-label': 'weight'
-                      }}
-                    /> */}
-                    {/* <Divider /> */}
                   </Box>
                   <PerfectScrollbar style={{ height: '100%', maxHeight: 'calc(100vh - 250px)', overflowX: 'hidden' }}>
                     <Box sx={{ p: 2, pt: 0 }}>
-                      {/* <UpgradePlanCard /> */}
-                      {/* <Divider /> */}
                       <Card
                         sx={{
                           bgcolor: theme.palette.primary.light,
-                          my: 2 
+                          my: 2
                         }}
                       >
-                        {/* <CardContent>
-                          <Grid container spacing={3} direction="column">
-                            <Grid item>
-                              <Grid item container alignItems="center" justifyContent="space-between">
-                                <Grid item>
-                                  <Typography variant="subtitle1">Start DND Mode</Typography>
-                                </Grid>
-                                <Grid item>
-                                  <Switch
-                                    color="primary"
-                                    checked={sdm}
-                                    onChange={(e) => setSdm(e.target.checked)}
-                                    name="sdm"
-                                    size="small"
-                                  />
-                                </Grid>
-                              </Grid>
-                            </Grid>
-                            <Grid item>
-                              <Grid item container alignItems="center" justifyContent="space-between">
-                                <Grid item>
-                                  <Typography variant="subtitle1">Allow Notifications</Typography>
-                                </Grid>
-                                <Grid item>
-                                  <Switch
-                                    checked={notification}
-                                    onChange={(e) => setNotification(e.target.checked)}
-                                    name="sdm"
-                                    size="small"
-                                  />
-                                </Grid>
-                              </Grid>
-                            </Grid>
-                          </Grid>
-                        </CardContent> */}
                       </Card>
                       <Divider />
                       <List
@@ -252,7 +202,7 @@ const ProfileSection = () => {
                           }
                         }}
                       >
-                        <ListItemButton
+                        {/* <ListItemButton
                           sx={{ borderRadius: `${customization.borderRadius}px` }}
                           selected={selectedIndex === 1}
                           onClick={(event) => handleListItemClick(event, 0, '#')}
@@ -261,11 +211,11 @@ const ProfileSection = () => {
                             <IconSettings stroke={1.5} size="1.3rem" />
                           </ListItemIcon>
                           <ListItemText primary={<Typography variant="body2">Paramètre</Typography>} />
-                        </ListItemButton>
+                        </ListItemButton> */}
                         <ListItemButton
                           sx={{ borderRadius: `${customization.borderRadius}px` }}
                           selected={selectedIndex === 1}
-                          onClick={(event) => handleListItemClick(event, 1, '#')}
+                          onClick={handleNavigation}
                         >
                           <ListItemIcon>
                             <IconUser stroke={1.5} size="1.3rem" />
@@ -274,18 +224,16 @@ const ProfileSection = () => {
                             primary={
                               <Grid container spacing={1} justifyContent="space-between">
                                 <Grid item>
-                                  <Typography variant="body2">Profile</Typography>
-                                </Grid>
-                                {/* <Grid item>
-                                  <Chip
-                                    label="02"
-                                    size="small"
-                                    sx={{
-                                      bgcolor: theme.palette.warning.dark,
-                                      color: theme.palette.background.default
+                                  <Typography
+                                    variant="body2"
+                                    style={{
+                                      textDecoration: 'none',
+                                      color: 'inherit'
                                     }}
-                                  />
-                                </Grid> */}
+                                  >
+                                    Profile
+                                  </Typography>
+                                </Grid>
                               </Grid>
                             }
                           />

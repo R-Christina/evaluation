@@ -18,7 +18,7 @@ namespace EvaluationService.Models
         public string Value { get; set; }        
 
         [Required]
-        public string ValidatedBy {get; set;}          
+        public string? ValidatedBy {get; set;}          
         
         [Required]
         public DateTime CreatedAt { get; set; } = DateTime.Now; 

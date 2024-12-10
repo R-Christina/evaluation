@@ -6,7 +6,7 @@ import { useParams } from 'react-router-dom';
 
 
 function Index() {
-    const phase = "Mi-Parcours";
+    const phase = "Évaluation Finale";
     const { userId } = useParams();
 
     return (

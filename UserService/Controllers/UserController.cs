@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.DirectoryServices;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -90,6 +91,7 @@ namespace UserService.Controllers
                     searcher.PropertiesToLoad.Add("department");
                     searcher.PropertiesToLoad.Add("ObjectGUID");
                     searcher.PropertiesToLoad.Add("userAccountControl");
+                    searcher.PropertiesToLoad.Add("sAMAccountName");
                     searcher.PageSize = 2000;
                     
 
@@ -98,6 +100,7 @@ namespace UserService.Controllers
                             DirectoryEntry userEntry = result.GetDirectoryEntry();
                             string displayName = userEntry.Properties["displayName"].Value?.ToString();
                             string mail = userEntry.Properties["mail"].Value?.ToString();
+                            string matricule = userEntry.Properties["sAMAccountName"].Value?.ToString();
 
                             if (!string.IsNullOrEmpty(displayName) && !displayName.EndsWith("$") && !string.IsNullOrEmpty(mail))
                             {
@@ -127,6 +130,7 @@ namespace UserService.Controllers
                                         Id = objectGuidString,
                                         DirectReports = new List<UserAD>(),
                                         IsActive = isActive,
+                                        Matricule = matricule,
                                     });
                                 }
                             }
@@ -212,6 +216,7 @@ namespace UserService.Controllers
                         searcher.PropertiesToLoad.Add("title");
                         searcher.PropertiesToLoad.Add("department");
                         searcher.PropertiesToLoad.Add("ObjectGUID");
+                        searcher.PropertiesToLoad.Add("sAMAccountName");
  
                         SearchResult result = searcher.FindOne();
                         if (result != null)
@@ -285,7 +290,8 @@ namespace UserService.Controllers
                             Poste = adUser?.Title,
                             Department = depart,
                             SuperiorId = adUser?.DirectReports?.FirstOrDefault()?.Id,
-                            SuperiorName = adUser?.DirectReports?.FirstOrDefault()?.DisplayName
+                            SuperiorName = adUser?.DirectReports?.FirstOrDefault()?.DisplayName,
+                            Matricule = adUser?.Matricule
                         };
  
                         users.Add(user);
@@ -361,28 +367,92 @@ namespace UserService.Controllers
             }
         }
 
-
-        //all user from database
-        [HttpGet]
-        [Route("all")]
-        public async Task<ActionResult<IEnumerable<User>>> GetAllUser([FromQuery] UserSearchDTO dto)
+        [HttpPost("remove-habilitations")]
+        public async Task<IActionResult> RemoveHabilitations([FromBody] RemoveHabilitationDto dto)
         {
             try
             {
+                // Récupérer tous les utilisateurs concernés, y compris leurs habilitations existantes
+                var users = await _context.Users.Include(u => u.Habilitations)
+                    .Where(u => dto.UserIds.Contains(u.Id))
+                    .ToListAsync();
 
+                if (users.Count != dto.UserIds.Count)
+                {
+                    return BadRequest("Certains utilisateurs n'ont pas été trouvés.");
+                }
+
+                // Vérifier si des habilitations sont spécifiées
+                if (!dto.HabilitationIds.Any())
+                {
+                    return BadRequest("Aucune habilitation à supprimer n'a été spécifiée.");
+                }
+
+                // Récupérer les habilitations à supprimer basées sur les IDs fournis
+                var habilitationsToRemove = await _context.Habilitations
+                    .Where(h => dto.HabilitationIds.Contains(h.Id))
+                    .ToListAsync();
+
+                if (habilitationsToRemove.Count != dto.HabilitationIds.Count)
+                {
+                    return BadRequest("Certaines habilitations n'ont pas été trouvées.");
+                }
+
+                // Supprimer les habilitations spécifiées pour chaque utilisateur
+                foreach (var user in users)
+                {
+                    user.Habilitations.RemoveAll(h => dto.HabilitationIds.Contains(h.Id));
+                }
+
+                await _context.SaveChangesAsync();
+                return Ok("Habilitation(s) supprimée(s) avec succès.");
+            }
+            catch (Exception e)
+            {
+                return StatusCode(500, $"Erreur interne du serveur : {e.Message}");
+            }
+        }
+
+        [HttpGet]
+        [Route("all")]
+        public async Task<ActionResult<IEnumerable<UserDTO>>> GetAllUser([FromQuery] UserSearchDTO dto)
+        {
+            try
+            {
                 var query = _context.Users.AsQueryable();
 
                 if (!string.IsNullOrEmpty(dto.NameOrMail))
                 {
                     query = query.Where(x => x.Name.Contains(dto.NameOrMail) || x.Email.Contains(dto.NameOrMail));
                 }
+
                 if (!string.IsNullOrEmpty(dto.Department))
                 {
                     query = query.Where(u => u.Department == dto.Department);
                 }
+
                 if (!string.IsNullOrEmpty(dto.Habilitation))
                 {
                     query = query.Where(u => u.Habilitations.Any(h => h.Label == dto.Habilitation));
+                }
+
+                if (!string.IsNullOrEmpty(dto.TypeUser))
+                {
+                    // Tenter de parser la chaîne en EmployeeType
+                    if (Enum.TryParse<EmployeeType>(dto.TypeUser, ignoreCase: true, out var typeUserEnum))
+                    {
+                        query = query.Where(u => u.TypeUser == typeUserEnum);
+                    }
+                    else
+                    {
+                        return BadRequest($"TypeUser invalide : {dto.TypeUser}");
+                    }
+                }
+
+                // Ajout de la condition pour le Matricule
+                if (!string.IsNullOrEmpty(dto.Matricule))
+                {
+                    query = query.Where(u => u.Matricule.Contains(dto.Matricule));
                 }
 
                 var users = await query
@@ -390,9 +460,10 @@ namespace UserService.Controllers
                     .Select(u => new UserDTO
                     {
                         Id = u.Id,
+                        Matricule = u.Matricule,
                         Name = u.Name ?? "",
                         Email = u.Email ?? "",
-                        Department = u.Department != null ? u.Department == "Direction des Systèmes d'Information" ? "DSI" : u.Department : "",
+                        Department = u.Department != null ? (u.Department == "Direction des Systèmes d'Information" ? "DSI" : u.Department) : "",
                         Poste = u.Poste ?? "",
                         SuperiorId = u.SuperiorId ?? "",
                         SuperiorName = u.SuperiorName ?? "",
@@ -404,7 +475,6 @@ namespace UserService.Controllers
                             Label = h.Label ?? ""
                         }).ToList()
                     })
-
                     .ToListAsync();
 
                 return Ok(users);
@@ -414,6 +484,8 @@ namespace UserService.Controllers
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
+
+
 
         [HttpGet]
         [Route("all-cadre")]
@@ -544,6 +616,7 @@ namespace UserService.Controllers
                     .Select(u => new UserDTO
                     {
                         Id = u.Id,
+                        Matricule = u.Matricule,
                         Name = u.Name ?? "",
                         Email = u.Email ?? "",
                         Department = u.Department != null ? u.Department == "Direction des Systèmes d'Information" ? "DSI" : u.Department : "",
@@ -569,7 +642,6 @@ namespace UserService.Controllers
         }
 
 
-
         [HttpGet("user")]
         public async Task<ActionResult<IEnumerable<UserDTO>>> GetAllUser()
         {
@@ -580,6 +652,7 @@ namespace UserService.Controllers
                     .Select(u => new UserDTO
                     {
                         Id = u.Id,
+                        Matricule = u.Matricule,
                         Name = u.Name ?? "",
                         Email = u.Email ?? "",
                         Department = u.Department != null 
@@ -591,7 +664,7 @@ namespace UserService.Controllers
                         SuperiorId = u.SuperiorId ?? "",
                         SuperiorName = u.SuperiorName ?? "",
                         Status = u.Status ?? "",
-
+                        TypeUser = u.TypeUser.HasValue ? u.TypeUser.Value.ToString() : "Aucun",
                         Habilitations = u.Habilitations.Select(h => new HabilitationIDLabelDto
                         {
                             Id = h.Id,
@@ -608,6 +681,7 @@ namespace UserService.Controllers
             }
         }
 
+
         [HttpGet("user/{id}")]
         public async Task<ActionResult<UserDTO>> GetUserById(string id)
         {
@@ -619,11 +693,12 @@ namespace UserService.Controllers
                     .Select(u => new UserDTO
                     {
                         Id = u.Id,
+                        Matricule = u.Matricule,
                         Name = u.Name ?? "",
                         Email = u.Email ?? "",
                         Department = u.Department != null 
                             ? u.Department == "Direction des Systèmes d'Information" 
-                                ? "DSI" 
+                                ? "DSI"
                                 : u.Department 
                             : "",
                         Poste = u.Poste ?? "",
@@ -774,7 +849,55 @@ namespace UserService.Controllers
             await _context.SaveChangesAsync();
 
             return Ok("Les types d'utilisateur ont été mis à jour avec succès.");
-        }       
+        }
+
+        private bool IsValidBase64(string base64String)
+        {
+            if (string.IsNullOrWhiteSpace(base64String)) return false;
+
+            Span<byte> buffer = new Span<byte>(new byte[base64String.Length]);
+            return Convert.TryFromBase64String(base64String, buffer, out _);
+        }
+
+        [HttpPut("update-user-signature")]
+        public async Task<IActionResult> UpdateUserSignature([FromBody] UpdateUsersSignatureDto dto)
+        {
+            if (string.IsNullOrEmpty(dto.UserId))
+            {
+                return BadRequest(new
+                {
+                    message = "L'ID de l'utilisateur est requis."
+                });
+            }
+
+            if (!IsValidBase64(dto.NewSignature))
+            {
+                return BadRequest(new
+                {
+                    message = "La signature fournie n'est pas valide"
+                });
+            }
+
+            var user = await _context.Users.FindAsync(dto.UserId);
+
+            if (user == null)
+            {
+                return NotFound(new
+                {
+                    message = "Utilisateur non trouvé avec l'ID fourni."
+                });
+            }
+
+            user.Signature = dto.NewSignature;
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "La signature de l'utilisateur a été mise à jour avec succès."
+            });
+        }
+
+
 
 
         [HttpGet]
@@ -935,6 +1058,68 @@ namespace UserService.Controllers
             }
         }
 
+        [HttpGet("user/manager")]
+        public async Task<UserDTO> GetManagerByUserIdAsync(string userId)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(userId))
+                {
+                    throw new ArgumentException("User ID must be provided.");
+                }
+
+                // Récupérer l'utilisateur à partir de son ID
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+                
+                if (user == null)
+                {
+                    throw new KeyNotFoundException("User not found.");
+                }
+
+                if (string.IsNullOrEmpty(user.SuperiorId))
+                {
+                    throw new InvalidOperationException("The user does not have a manager assigned.");
+                }
+
+                // Récupérer le manager à partir de l'ID du manager de l'utilisateur
+                var manager = await _context.Users.FirstOrDefaultAsync(u => u.Id == user.SuperiorId);
+
+                if (manager == null)
+                {
+                    throw new KeyNotFoundException("Manager not found.");
+                }
+
+                // Mapper les données du manager dans un objet UserDTO
+                var managerDto = new UserDTO
+                {
+                    Id = manager.Id,
+                    Matricule = manager.Matricule,
+                    Email = manager.Email,
+                    Name = manager.Name,
+                    Department = manager.Department,
+                    Poste = manager.Poste,
+                    SuperiorId = manager.SuperiorId,
+                    SuperiorName = manager.SuperiorName,
+                    Status = manager.Status,
+                    TypeUser = manager.TypeUser.HasValue ? manager.TypeUser.ToString() : null,
+                    Habilitations = manager.Habilitations?.Select(h => new HabilitationIDLabelDto
+                    {
+                        Id = h.Id,
+                        Label = h.Label
+                    }).ToList() ?? new List<HabilitationIDLabelDto>() // Utiliser une liste vide si null
+                };
+
+                return managerDto;
+            }
+            catch (Exception ex)
+            {
+                // Log the error
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                throw;
+            }
+        }
+
+
         [HttpGet("user/subordonates")]
         public async Task<IEnumerable<UserDTO>> GetUsersBySuperiorIdAsync(string superiorId)
         {
@@ -949,6 +1134,7 @@ namespace UserService.Controllers
                 var users = await _context.Users.Where(u => u.SuperiorId == superiorId).Select(u => new UserDTO
                 {
                     Id = u.Id,
+                    Matricule = u.Matricule,
                     Email = u.Email,
                     Name = u.Name,
                     Department = u.Department,
@@ -975,172 +1161,183 @@ namespace UserService.Controllers
         }
  
         // ACTUALIZE
-        // [HttpPost("Actualize")]
-        // public async Task<IActionResult> ActualiseUsers()
-        // {
-        //     try
-        //     {
-        //         // get the user from Active directory
-        //         var adUsers = BuildFullOrganisationHierarchy();
-        //         // get users from bdd
-        //         var dbUsers = await _context.Users.ToListAsync();
+        [HttpPost("Actualize")]
+        public async Task<IActionResult> ActualiseUsers()
+        {
+            try
+            {
+                // get the user from Active directory
+                var adUsers = BuildFullOrganisationHierarchy();
+                // get users from bdd
+                var dbUsers = await _context.Users.ToListAsync();
  
-        //         // Create dictionary for fast comparison
-        //         var adUserDict = adUsers.ToDictionary(x => x.Id);
-        //         var dbUsersDict = dbUsers.ToDictionary(x => x.Id);
+                // Create dictionary for fast comparison
+                var adUserDict = adUsers.ToDictionary(x => x.Id);
+                var dbUsersDict = dbUsers.ToDictionary(x => x.Id);
  
-        //         // List for modification
-        //         var usersToAdd = new List<User>();
-        //         var usersToUpdate = new List<User>();
-        //         var usersToDelete = new List<User>();
- 
- 
- 
-        //         // Compare and add new users (in AD but not in bd)
-        //         foreach (var adUser in adUsers)
-        //         {
- 
- 
-        //             if (!dbUsersDict.ContainsKey(adUser.Id))
-        //             {
-        //                 var profilePicture = "https://ravinalaairportsmadagascar.sharepoint.com/_vti_bin/afdcache.ashx/_userprofile/userphoto.jpg?_oat_=1727750452_23b68f353d771a83e90931346b581ed0192096ce5e332065c363bf4e5faf1901&P1=1727697792&P2=2073235389&P3=1&P4=bFvxgEa8MLJ4hEnnyCRLnbDKAnGjvd27wO74GExZ%2B6qjzFWAZrlCiYQ%2FsXPeOUOVD%2B%2BxfOxWRPBLK918UPbrfj7FB5edhWDhHtZkZyhUZoVH2Wkh1ihWOpMO7T32XRsPJCUG03h%2FrobkSMMNkpc3Je%2BM6VFS5pOi0QrnCTRjfrTx0uTVDRlhpGfFf%2FXjYG%2F%2FRXSnEQIsavdKD8f7qkj4fjmJbLdTvuFzU73HKSFO0NZ7x5gUYur%2BRZiyxNjIzVVtOzxpD6MVSSY4m18kSe6BxGJprEBFUlqVAn02Afy5pnO7lXEtSM5fmc9fMcYrM9kovWgMeHGnDJzLPAsT9pqinA%3D%3D&size=S&accountname=";
-        //                 var directReports = adUser.DirectReports;
-        //                 var superior = directReports?.FirstOrDefault();
- 
-        //                 usersToAdd.Add(new User
-        //                 {
-        //                     Id = adUser.Id,
-        //                     Name = adUser.DisplayName,
-        //                     Email = adUser.Email,
-        //                     Department = adUser.Department,
-        //                     Poste = adUser.Title,
-        //                     SuperiorId = superior?.Id,
-        //                     SuperiorName = superior?.DisplayName,
-        //                     ProfilePicture = $"{profilePicture}{adUser.Email.Split("@")[0]}%40ravinala-airports.aero",
-        //                 });
-        //             }
-        //         }
+                // List for modification
+                var usersToAdd = new List<User>();
+                var usersToUpdate = new List<User>();
+                var usersToDelete = new List<User>();
  
  
  
-        //         // Compare and update existing user (id AD and DB but different data)
-        //         foreach (var dbUser in dbUsers)
-        //         {
-        //             if (adUserDict.TryGetValue(dbUser.Id, out var aduser))
-        //             {
-        //                 var profilePicture = "https://ravinalaairportsmadagascar.sharepoint.com/_vti_bin/afdcache.ashx/_userprofile/userphoto.jpg?_oat_=1727750452_23b68f353d771a83e90931346b581ed0192096ce5e332065c363bf4e5faf1901&P1=1727697792&P2=2073235389&P3=1&P4=bFvxgEa8MLJ4hEnnyCRLnbDKAnGjvd27wO74GExZ%2B6qjzFWAZrlCiYQ%2FsXPeOUOVD%2B%2BxfOxWRPBLK918UPbrfj7FB5edhWDhHtZkZyhUZoVH2Wkh1ihWOpMO7T32XRsPJCUG03h%2FrobkSMMNkpc3Je%2BM6VFS5pOi0QrnCTRjfrTx0uTVDRlhpGfFf%2FXjYG%2F%2FRXSnEQIsavdKD8f7qkj4fjmJbLdTvuFzU73HKSFO0NZ7x5gUYur%2BRZiyxNjIzVVtOzxpD6MVSSY4m18kSe6BxGJprEBFUlqVAn02Afy5pnO7lXEtSM5fmc9fMcYrM9kovWgMeHGnDJzLPAsT9pqinA%3D%3D&size=S&accountname=";
+                // Compare and add new users (in AD but not in bd)
+                foreach (var adUser in adUsers)
+                {
  
  
-        //                 var directReports = aduser.DirectReports;
-        //                 var superior = directReports.FirstOrDefault();
-        //                 var superiorId = aduser?.DirectReports?.FirstOrDefault()?.Id;
-        //                 var superiorName = aduser?.DirectReports?.FirstOrDefault()?.DisplayName;
+                    if (!dbUsersDict.ContainsKey(adUser.Id))
+                    {
+                        var profilePicture = "https://ravinalaairportsmadagascar.sharepoint.com/_vti_bin/afdcache.ashx/_userprofile/userphoto.jpg?_oat_=1727750452_23b68f353d771a83e90931346b581ed0192096ce5e332065c363bf4e5faf1901&P1=1727697792&P2=2073235389&P3=1&P4=bFvxgEa8MLJ4hEnnyCRLnbDKAnGjvd27wO74GExZ%2B6qjzFWAZrlCiYQ%2FsXPeOUOVD%2B%2BxfOxWRPBLK918UPbrfj7FB5edhWDhHtZkZyhUZoVH2Wkh1ihWOpMO7T32XRsPJCUG03h%2FrobkSMMNkpc3Je%2BM6VFS5pOi0QrnCTRjfrTx0uTVDRlhpGfFf%2FXjYG%2F%2FRXSnEQIsavdKD8f7qkj4fjmJbLdTvuFzU73HKSFO0NZ7x5gUYur%2BRZiyxNjIzVVtOzxpD6MVSSY4m18kSe6BxGJprEBFUlqVAn02Afy5pnO7lXEtSM5fmc9fMcYrM9kovWgMeHGnDJzLPAsT9pqinA%3D%3D&size=S&accountname=";
+                        var directReports = adUser.DirectReports;
+                        var superior = directReports?.FirstOrDefault();
  
-        //                 string? depart = aduser?.Department;
+                        usersToAdd.Add(new User
+                        {
+                            Id = adUser.Id,
+                            Name = adUser.DisplayName,
+                            Email = adUser.Email,
+                            Department = adUser.Department,
+                            Poste = adUser.Title,
+                            SuperiorId = superior?.Id,
+                            SuperiorName = superior?.DisplayName,
+                        });
+                    }
+                }
  
-        //                 if (string.IsNullOrEmpty(aduser?.Department) && aduser.DisplayName.Contains('('))
-        //                 {
-        //                     depart = aduser?.DisplayName?.Split('(', ')')[1].Trim();
-        //                 }
  
-        //                 if (dbUser.Name != aduser?.DisplayName || dbUser.Email != aduser?.Email ||
-        //                     dbUser.Department != depart || dbUser.Poste != aduser?.Title ||
-        //                     dbUser.SuperiorId != superiorId || dbUser.SuperiorName != superiorName ||
-        //                     dbUser.ProfilePicture == null)
-        //                 {
-        //                     dbUser.Name = aduser?.DisplayName;
-        //                     dbUser.Email = aduser?.Email;
-        //                     dbUser.Department = depart;
-        //                     dbUser.Poste = aduser?.Title;
-        //                     dbUser.SuperiorId = superiorId;
-        //                     dbUser.SuperiorName = superiorName;
-        //                     dbUser.ProfilePicture = $"{profilePicture}{aduser?.Email.Split("@")[0]}%40ravinala-airports.aero";
  
-        //                     usersToUpdate.Add(dbUser);
-        //                 }
-        //             }
-        //             else
-        //             {
-        //                 // If the user is no longer in AD, mark for deletion
-        //                 usersToDelete.Add(dbUser);
-        //             }
-        //         }
+                // Compare and update existing user (id AD and DB but different data)
+                foreach (var dbUser in dbUsers)
+                {
+                    if (adUserDict.TryGetValue(dbUser.Id, out var aduser))
+                    {
+                        var profilePicture = "https://ravinalaairportsmadagascar.sharepoint.com/_vti_bin/afdcache.ashx/_userprofile/userphoto.jpg?_oat_=1727750452_23b68f353d771a83e90931346b581ed0192096ce5e332065c363bf4e5faf1901&P1=1727697792&P2=2073235389&P3=1&P4=bFvxgEa8MLJ4hEnnyCRLnbDKAnGjvd27wO74GExZ%2B6qjzFWAZrlCiYQ%2FsXPeOUOVD%2B%2BxfOxWRPBLK918UPbrfj7FB5edhWDhHtZkZyhUZoVH2Wkh1ihWOpMO7T32XRsPJCUG03h%2FrobkSMMNkpc3Je%2BM6VFS5pOi0QrnCTRjfrTx0uTVDRlhpGfFf%2FXjYG%2F%2FRXSnEQIsavdKD8f7qkj4fjmJbLdTvuFzU73HKSFO0NZ7x5gUYur%2BRZiyxNjIzVVtOzxpD6MVSSY4m18kSe6BxGJprEBFUlqVAn02Afy5pnO7lXEtSM5fmc9fMcYrM9kovWgMeHGnDJzLPAsT9pqinA%3D%3D&size=S&accountname=";
  
-        //         // Applyings the changes
-        //         if (usersToAdd.Count != 0)
-        //         {
-        //             int batchSize = 10;
-        //             for (int i = 0; i < usersToAdd.Count; i += batchSize)
-        //             {
-        //                 var batch = usersToAdd.Skip(i).Take(batchSize).ToList();
-        //                 try
-        //                 {
-        //                     _context.Users.AddRange(batch);
-        //                     await _context.SaveChangesAsync();
-        //                 }
-        //                 catch (Exception ex)
-        //                 {
-        //                     return StatusCode(500, $"Internal server error on transaction user add update: {ex.Message}");
  
-        //                 }
-        //             }
-        //         }
-        //         if (usersToUpdate.Count != 0)
-        //         {
-        //             int batchSize = 10;
-        //             for (int i = 0; i < usersToUpdate.Count; i += batchSize)
-        //             {
-        //                 var batch = usersToUpdate.Skip(i).Take(batchSize).ToList();
-        //                 try
-        //                 {
-        //                     _context.Users.UpdateRange(batch);
-        //                 }
-        //                 catch (Exception ex)
-        //                 {
-        //                     return StatusCode(500, $"Internal server error on transaction user update: {ex.Message}");
+                        var directReports = aduser.DirectReports;
+                        var superior = directReports.FirstOrDefault();
+                        var superiorId = aduser?.DirectReports?.FirstOrDefault()?.Id;
+                        var superiorName = aduser?.DirectReports?.FirstOrDefault()?.DisplayName;
  
-        //                 }
-        //             }
-        //         }
-        //         if (usersToDelete.Count != 0)
-        //         {
-        //             int batchSize = 10;
-        //             for (int i = 0; i < usersToDelete.Count; i += batchSize)
-        //             {
-        //                 var batch = usersToDelete.Skip(i).Take(batchSize).ToList();
-        //                 try
-        //                 {
-        //                     _context.Users.RemoveRange(batch);
-        //                 }
-        //                 catch (Exception ex)
-        //                 {
-        //                     return StatusCode(500, $"Internal server error on transaction deleted update: {ex.Message}");
+                        string? depart = aduser?.Department;
  
-        //                 }
-        //             }
-        //         }
-        //         await _context.SaveChangesAsync();
+                        if (string.IsNullOrEmpty(aduser?.Department) && aduser.DisplayName.Contains('('))
+                        {
+                            depart = aduser?.DisplayName?.Split('(', ')')[1].Trim();
+                        }
  
-        //         return Ok(new
-        //         {
-        //             Added = usersToAdd.Count,
-        //             Updated = usersToUpdate.Count,
-        //             Deleted = usersToDelete.Count
-        //         });
-        //     }
-        //     catch (Exception ex)
-        //     {
-        //         return StatusCode(500, $"Internal server error: {ex.Message}. Inner exception: {ex.InnerException?.Message}");
-        //     }
+                        if (dbUser.Name != aduser?.DisplayName || dbUser.Email != aduser?.Email ||
+                            dbUser.Department != depart || dbUser.Poste != aduser?.Title ||
+                            dbUser.SuperiorId != superiorId || dbUser.SuperiorName != superiorName )
+                        {
+                            dbUser.Name = aduser?.DisplayName;
+                            dbUser.Email = aduser?.Email;
+                            dbUser.Department = depart;
+                            dbUser.Poste = aduser?.Title;
+                            dbUser.SuperiorId = superiorId;
+                            dbUser.SuperiorName = superiorName;
  
-        // }
-
+                            usersToUpdate.Add(dbUser);
+                        }
+                    }
+                    else
+                    {
+                        // If the user is no longer in AD, mark for deletion
+                        usersToDelete.Add(dbUser);
+                    }
+                }
+ 
+                // Applyings the changes
+                if (usersToAdd.Count != 0)
+                {
+                    int batchSize = 10;
+                    for (int i = 0; i < usersToAdd.Count; i += batchSize)
+                    {
+                        var batch = usersToAdd.Skip(i).Take(batchSize).ToList();
+                        try
+                        {
+                            _context.Users.AddRange(batch);
+                            await _context.SaveChangesAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            return StatusCode(500, $"Internal server error on transaction user add update: {ex.Message}");
+ 
+                        }
+                    }
+                }
+                if (usersToUpdate.Count != 0)
+                {
+                    int batchSize = 10;
+                    for (int i = 0; i < usersToUpdate.Count; i += batchSize)
+                    {
+                        var batch = usersToUpdate.Skip(i).Take(batchSize).ToList();
+                        try
+                        {
+                            _context.Users.UpdateRange(batch);
+                        }
+                        catch (Exception ex)
+                        {
+                            return StatusCode(500, $"Internal server error on transaction user update: {ex.Message}");
+ 
+                        }
+                    }
+                }
+                if (usersToDelete.Count != 0)
+                {
+                    int batchSize = 10;
+                    for (int i = 0; i < usersToDelete.Count; i += batchSize)
+                    {
+                        var batch = usersToDelete.Skip(i).Take(batchSize).ToList();
+                        try
+                        {
+                            _context.Users.RemoveRange(batch);
+                        }
+                        catch (Exception ex)
+                        {
+                            return StatusCode(500, $"Internal server error on transaction deleted update: {ex.Message}");
+ 
+                        }
+                    }
+                }
+                await _context.SaveChangesAsync();
+ 
+                return Ok(new
+                {
+                    Added = usersToAdd.Count,
+                    Updated = usersToUpdate.Count,
+                    Deleted = usersToDelete.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}. Inner exception: {ex.InnerException?.Message}");
+            }
+ 
+        }
     }
         public class UpdateUsersTypeDto
         {
             public List<string> UserIds { get; set; } = new List<string>();
             public EmployeeType NewType { get; set; }
         }   
+
+        public class RemoveHabilitationDto
+        {
+            public List<string> UserIds { get; set; } // IDs des utilisateurs
+            public List<int> HabilitationIds { get; set; } // IDs des habilitations à supprimer
+        }
+
+        public class UpdateUsersSignatureDto
+        {
+            public string UserId { get; set; }
+
+            [StringLength(65536, ErrorMessage = "Le fichier ne peut pas dépasser 64 Ko.")]
+            public string NewSignature { get; set; }
+        }
+
 }
 
 

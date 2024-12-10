@@ -22,7 +22,7 @@ import { KeyboardArrowDown, KeyboardArrowUp, FilterList as FilterListIcon } from
 import CheckIcon from '@mui/icons-material/Check';
 import MainCard from 'ui-component/cards/MainCard';
 import { Link } from 'react-router-dom';
-import { authInstance } from '../../../../axiosConfig';
+import { authInstance, formulaireInstance } from '../../../../axiosConfig';
 
 const NOnAutoriser = () => {
   const [openRow, setOpenRow] = useState(null);
@@ -33,6 +33,31 @@ const NOnAutoriser = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
   const navigate = useNavigate();
+
+  const CLASSIFIER = 8;
+  const [canClassify, setCanClassify] = useState(false);
+
+  const checkPermissions = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const userId = user.id;
+
+      // Vérifier l'habilitation pour pourvoir classifier (8)
+      const classifyResponse = await formulaireInstance.get(`/Periode/test-authorization?userId=${userId}&requiredHabilitationAdminId=${CLASSIFIER}`);
+      setCanClassify(classifyResponse.data.hasAccess);
+
+    } catch (error) {
+      const errorData = error.response?.data;
+      setError(
+        typeof errorData === 'object'
+          ? JSON.stringify(errorData, null, 2)
+          : 'Erreur lors de la vérification des autorisations.'
+      );
+    }
+  };
+  useEffect(() => {
+    checkPermissions(); // Load initial users with null type on component mount
+  }, []);
 
   useEffect(() => {
     fetchInitialUsers(); // Load initial users with null type on component mount
@@ -103,7 +128,7 @@ const NOnAutoriser = () => {
           <Grid item>
             <Typography variant="subtitle2">Utilisateur</Typography>
             <Typography variant="h3" gutterBottom sx={{ marginTop: '0.5rem' }}>
-              Liste des utilisateurs sans type
+              Liste des collaborateurs non classifier
             </Typography>
           </Grid>
 
@@ -122,14 +147,16 @@ const NOnAutoriser = () => {
             >
               <FilterListIcon stroke={1.5} size="24px" />
             </IconButton>
+            {canClassify && (
             <Button
-              variant="outlined"
+              variant="contained"
               startIcon={<CheckIcon />}
               sx={{ marginLeft: 2 }}
               onClick={() => navigate('/utilisateur/autorisation')}
             >
               Autoriser
             </Button>
+            )}
           </Grid>
         </Grid>
       </MainCard>
@@ -172,26 +199,30 @@ const NOnAutoriser = () => {
         </Grid>
       </Menu>
 
-      <TableContainer>
-        <Table aria-label="employee table">
+      <TableContainer component="div" sx={{ padding: 2 }}>
+        <Table aria-label="collapsible table" sx={{ border: '1px solid #e0e0e0', borderRadius: '4px' }}>
           <TableHead>
-            <TableRow>
-              <TableCell>Nom et prénom</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Département</TableCell>
+            <TableRow sx={{ backgroundColor: '#f5f5f5' }}> 
+              <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', padding: '12px', borderRight: '1px solid #e0e0e0' }}>Matricule</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', padding: '12px', borderRight: '1px solid #e0e0e0' }}>Nom et prénom</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', padding: '12px', borderRight: '1px solid #e0e0e0' }}>Email</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', padding: '12px', borderRight: '1px solid #e0e0e0' }}>Département</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {currentEmployees.map((employee) => (
               <React.Fragment key={employee.id}>
                 <TableRow hover>
-                  <TableCell>
+                  <TableCell sx={{ borderRight: '1px solid #e0e0e0' }}>
                     <Link to={`/employee/${employee.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                      {employee.name}
+                      {employee.matricule}
                     </Link>
                   </TableCell>
-                  <TableCell>{employee.email}</TableCell>
-                  <TableCell>{employee.department}</TableCell>
+                  <TableCell sx={{ borderRight: '1px solid #e0e0e0' }}>
+                      {employee.name}
+                  </TableCell>
+                  <TableCell sx={{ borderRight: '1px solid #e0e0e0' }}>{employee.email}</TableCell>
+                  <TableCell sx={{ borderRight: '1px solid #e0e0e0' }}>{employee.department}</TableCell>
                 </TableRow>
               </React.Fragment>
             ))}

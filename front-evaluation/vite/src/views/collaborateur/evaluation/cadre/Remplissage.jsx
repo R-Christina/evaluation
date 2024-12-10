@@ -655,7 +655,7 @@ const Remplissage = () => {
                     return (
                       <MainCard key={priority.templatePriorityId} sx={{ mt: 3, p: 2, backgroundColor: '#E8EAF6' }}>
                         <Typography variant="h5" sx={{ mb: 3 }} gutterBottom>
-                          {priority.name}
+                          {priority.name} 
                         </Typography>
 
                         <AnimatePresence mode="wait">

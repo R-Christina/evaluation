@@ -7,6 +7,7 @@ D:\evaluation\EvaluationService\bin\Debug\net8.0\EvaluationService.dll
 D:\evaluation\EvaluationService\bin\Debug\net8.0\EvaluationService.pdb
 D:\evaluation\EvaluationService\bin\Debug\net8.0\Azure.Core.dll
 D:\evaluation\EvaluationService\bin\Debug\net8.0\Azure.Identity.dll
+D:\evaluation\EvaluationService\bin\Debug\net8.0\CsvHelper.dll
 D:\evaluation\EvaluationService\bin\Debug\net8.0\Humanizer.dll
 D:\evaluation\EvaluationService\bin\Debug\net8.0\Microsoft.AspNetCore.OpenApi.dll
 D:\evaluation\EvaluationService\bin\Debug\net8.0\Microsoft.Bcl.AsyncInterfaces.dll
@@ -39,6 +40,7 @@ D:\evaluation\EvaluationService\bin\Debug\net8.0\Microsoft.OpenApi.dll
 D:\evaluation\EvaluationService\bin\Debug\net8.0\Microsoft.SqlServer.Server.dll
 D:\evaluation\EvaluationService\bin\Debug\net8.0\Microsoft.Win32.SystemEvents.dll
 D:\evaluation\EvaluationService\bin\Debug\net8.0\Mono.TextTemplating.dll
+D:\evaluation\EvaluationService\bin\Debug\net8.0\Newtonsoft.Json.dll
 D:\evaluation\EvaluationService\bin\Debug\net8.0\Swashbuckle.AspNetCore.Swagger.dll
 D:\evaluation\EvaluationService\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerGen.dll
 D:\evaluation\EvaluationService\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerUI.dll
@@ -144,3 +146,4 @@ D:\evaluation\EvaluationService\obj\Debug\net8.0\refint\EvaluationService.dll
 D:\evaluation\EvaluationService\obj\Debug\net8.0\EvaluationService.pdb
 D:\evaluation\EvaluationService\obj\Debug\net8.0\EvaluationService.genruntimeconfig.cache
 D:\evaluation\EvaluationService\obj\Debug\net8.0\ref\EvaluationService.dll
+D:\evaluation\EvaluationService\bin\Debug\net8.0\System.Net.WebSockets.WebSocketProtocol.dll

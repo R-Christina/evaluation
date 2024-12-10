@@ -32,6 +32,8 @@ const Autorisation = Loadable(lazy(() => import('views/admin/utilisateur/TypeNul
 const Assignation = Loadable(lazy(() => import('views/admin/utilisateur/Assignation')));
 const AssignationAll = Loadable(lazy(() => import('views/admin/utilisateur/AssignationAll')));
 
+const ImportCSV = Loadable(lazy(() => import('views/admin/import/index')));
+
 // Rh
 const ListeEval = Loadable(lazy(() => import('views/rh/evaluation/Liste')));
 const AjoutEval = Loadable(lazy(() => import('views/rh/evaluation/Ajout')));
@@ -39,6 +41,11 @@ const FormulaireCadre = Loadable(lazy(() => import('views/rh/formulaire/cadre/Fo
 const FormulaireNonCadre = Loadable(lazy(() => import('views/rh/formulaire/nonCadre/index')));
 
 // collab
+
+//profile
+const Profile = Loadable(lazy(() => import('views/collaborateur/profile/index')));
+
+//evaluation
 const Remplissage = Loadable(lazy(() => import('views/collaborateur/evaluation/cadre/Remplissage')));
 const RemplissageNonCadre = Loadable(lazy(() => import('views/collaborateur/evaluation/nonCadre/Remplissage')));
 //archive
@@ -52,10 +59,11 @@ const AllNonCadreArchive = Loadable(lazy(() => import('views/collaborateur/archi
 const MyEvaluation = Loadable(lazy(() => import('views/collaborateur/archive/MyEvaluation')));
 const EvaluationPhasesCadre = Loadable(lazy(() => import('views/collaborateur/archive/cadre/EvaluationPhasesCadre')));
 const EvaluationPhasesNonCadre = Loadable(lazy(() => import('views/collaborateur/archive/nonCadre/EvaluationPhasesNonCadre')));
-
 //stat
 const IndexCadre = Loadable(lazy(() => import('views/collaborateur/stat/cadre/index')));
 const IndexNonCadre = Loadable(lazy(() => import('views/collaborateur/stat/nonCadre/index')));
+//signature
+const AssignSignature = Loadable(lazy(() => import('views/collaborateur/profile/Signature')));
 
 
 //manager
@@ -64,8 +72,12 @@ const FixationCadre = Loadable(lazy(() => import('views/collaborateur/manager/ca
 const FixationNonCadre = Loadable(lazy(() => import('views/collaborateur/manager/nonCadre/Fixation')));
 
 
-// sample page routing
-// const SamplePage = Loadable(lazy(() => import('views/sample-page')));
+
+//test 
+const CollabFo = Loadable(lazy(() => import('views/test/cadreTest/collab/CollabFo')));
+const ManagerFo = Loadable(lazy(() => import('views/test/cadreTest/manager/ManagerFo')));
+const CollabNFo = Loadable(lazy(() => import('views/test/nonCadreTest/collab/CollabNFo')));
+const ManagerNFo = Loadable(lazy(() => import('views/test/nonCadreTest/manager/ManagerNFo')));
 
 // ==============================|| MAIN ROUTING ||============================== //
 
@@ -218,6 +230,16 @@ const MainRoutes = {
     },
 
     {
+      path: 'import',
+      children: [
+        {
+          path: 'importCSV',
+          element: <ImportCSV />
+        }
+      ]
+    },
+
+    {
       path: 'evaluation',
       children: [
         {
@@ -258,6 +280,17 @@ const MainRoutes = {
     },
 
     //collab
+    //profile
+    {
+      path: 'collab',
+      children: [
+        {
+          path: 'profile',
+          element: <Profile />
+        }
+      ]
+    },
+    //evaluation
     {
       path: 'evaluation',
       children: [
@@ -409,43 +442,56 @@ const MainRoutes = {
           element: <IndexNonCadre />
         }
       ]
+    },
+
+//signature
+    {
+      path: 'signature',
+      children: [
+        {
+          path: 'assign',
+          element: <AssignSignature />
+        }
+      ]
+    },
+
+    //test 
+    {
+      path: 'test',
+      children: [
+        {
+          path: 'collabFo',
+          element: <CollabFo />
+        }
+      ]
+    },
+    {
+      path: 'test',
+      children: [
+        {
+          path: 'managerFo',
+          element: <ManagerFo />
+        }
+      ]
+    },
+    {
+      path: 'test',
+      children: [
+        {
+          path: 'collabNFo',
+          element: <CollabNFo />
+        }
+      ]
+    },
+    {
+      path: 'test',
+      children: [
+        {
+          path: 'managerNFo',
+          element: <ManagerNFo />
+        }
+      ]
     }
-
-
-    // {
-    //   path: 'utils',
-    //   children: [
-    //     {
-    //       path: 'util-typography',
-    //       element: <UtilsTypography />
-    //     }
-    //   ]
-    // },
-
-    // {
-    //   path: 'utils',
-    //   children: [
-    //     {
-    //       path: 'util-color',
-    //       element: <UtilsColor />
-    //     }
-    //   ]
-    // },
-
-    // {
-    //   path: 'utils',
-    //   children: [
-    //     {
-    //       path: 'util-shadow',
-    //       element: <UtilsShadow />
-    //     }
-    //   ]
-    // },
-
-    // {
-    //   path: 'sample-page',
-    //   element: <SamplePage />
-    // }
   ]
 };
 

@@ -23,9 +23,13 @@ namespace EvaluationService.Models
         public decimal Weighting { get; set; }
 
         [Required]
-        public string ValidatedBy {get; set;}
+        [MaxLength(255)]
+        public string ResultIndicator { get; set; }
 
-        [Required]
+        public decimal? Resultat { get; set; }
+
+        public string? ValidatedBy {get; set;}
+
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
         // Navigation property to UserEvaluations

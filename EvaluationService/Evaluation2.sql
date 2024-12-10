@@ -102,6 +102,20 @@ CREATE TABLE [HistoryCMps] (
 );
 GO
 
+CREATE TABLE [HistoryFIs] (
+    [HcfiId] int NOT NULL IDENTITY,
+    [UserEvalId] int NOT NULL,
+    [PriorityName] nvarchar(255) NOT NULL,
+    [Description] nvarchar(255) NOT NULL,
+    [Weighting] decimal(18,2) NOT NULL,
+    [ResultIndicator] nvarchar(max) NOT NULL,
+    [Result] decimal(18,2) NOT NULL,
+    [UpdatedAt] datetime2 NOT NULL,
+    CONSTRAINT [PK_HistoryCMps] PRIMARY KEY ([HcfiId]),
+    CONSTRAINT [FK_HistoryCMps_UserEvaluations_UserEvalId] FOREIGN KEY ([UserEvalId]) REFERENCES [UserEvaluations] ([UserEvalId]) ON DELETE CASCADE
+);
+GO
+
 CREATE TABLE [ObjectiveColumns] (
     [ColumnId] int NOT NULL IDENTITY,
     [Name] nvarchar(255) NOT NULL,
@@ -134,12 +148,23 @@ GO
 
 CREATE TABLE [HistoryObjectiveColumnValuesMps] (
     [HistValueId] int NOT NULL IDENTITY,
-    [HcmId] int NOT NULL,
+    [HcfiId] int NOT NULL,
     [ColumnName] nvarchar(max) NOT NULL,
     [Value] nvarchar(max) NOT NULL,
     [CreatedAt] datetime2 NOT NULL,
     CONSTRAINT [PK_HistoryObjectiveColumnValuesMps] PRIMARY KEY ([HistValueId]),
-    CONSTRAINT [FK_HistoryObjectiveColumnValuesMps_HistoryCMps_HcmId] FOREIGN KEY ([HcmId]) REFERENCES [HistoryCMps] ([HcmId]) ON DELETE CASCADE
+    CONSTRAINT [FK_HistoryObjectiveColumnValuesMps_HistoryCMps_HcfiId] FOREIGN KEY ([HcfiId]) REFERENCES [HistoryCFis] ([HcfiId]) ON DELETE CASCADE
+);
+GO
+
+CREATE TABLE [HistoryObjectiveColumnValuesFi] (
+    [HistValueId] int NOT NULL IDENTITY,
+    [HcmId] int NOT NULL,
+    [ColumnName] nvarchar(max) NOT NULL,
+    [Value] nvarchar(max) NOT NULL,
+    [CreatedAt] datetime2 NOT NULL,
+    CONSTRAINT [HistoryObjectiveColumnValuesFi] PRIMARY KEY ([HistValueId]),
+    CONSTRAINT [FK_HistoryObjectiveColumnValuesFi_HistoryCFis_HcmId] FOREIGN KEY ([HcmId]) REFERENCES [HistoryCMps] ([HcmId]) ON DELETE CASCADE
 );
 GO
 

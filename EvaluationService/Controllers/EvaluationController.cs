@@ -1,7 +1,10 @@
+using System.Text.Json;
+using CommonModels.DTOs;
 using EvaluationService.Data;
 using EvaluationService.DTOs;
 using EvaluationService.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -14,12 +17,14 @@ namespace EvaluationService.Controllers
         private readonly AppdbContext _context;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<EvaluationController> _logger;
+        private readonly IHubContext<NotificationHub> _hubContext;
 
-        public EvaluationController(AppdbContext context, IHttpClientFactory httpClientFactory, ILogger<EvaluationController> logger)
+        public EvaluationController(AppdbContext context, IHttpClientFactory httpClientFactory, ILogger<EvaluationController> logger, IHubContext<NotificationHub> hubContext)
         {
             _context = context;
             _httpClientFactory = httpClientFactory;
             _logger = logger;
+            _hubContext = hubContext;
         }
 
         [HttpGet("{evalId}")]
@@ -45,6 +50,54 @@ namespace EvaluationService.Controllers
 
             var users = await response.Content.ReadFromJsonAsync<List<UserDto>>();
             return users ?? new List<UserDto>();
+        }
+
+        private async Task<UserDTO> GetManagerByUserIdAsync(string userId)
+        {
+            if (string.IsNullOrEmpty(userId))
+            {
+                throw new ArgumentException("User ID must be provided.");
+            }
+            var client = _httpClientFactory.CreateClient("UserService");
+            var response = await client.GetAsync($"api/User/user/manager?userId={userId}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException($"Error fetching manager: {response.ReasonPhrase}");
+            }
+
+            var manager = await response.Content.ReadFromJsonAsync<UserDTO>();
+
+            if (manager == null)
+            {
+                throw new KeyNotFoundException("Manager not found.");
+            }
+
+            return manager;
+        }
+
+        private async Task<UserDTO> GetUserDetails(string userId)
+        {
+            if (string.IsNullOrEmpty(userId))
+            {
+                throw new ArgumentException("User ID must be provided.");
+            }
+            var client = _httpClientFactory.CreateClient("UserService");
+            var response = await client.GetAsync($"api/User/user/{userId}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException($"Error fetching manager: {response.ReasonPhrase}");
+            }
+
+            var details = await response.Content.ReadFromJsonAsync<UserDTO>();
+
+            if (details == null)
+            {
+                throw new KeyNotFoundException("Manager not found.");
+            }
+
+            return details;
         }
 
         [HttpPut("start/{evalId}")]
@@ -87,7 +140,6 @@ namespace EvaluationService.Controllers
         }
 
 
-        [HttpGet("enCours/{evalId}/{userId}")]
         private async Task<int?> GetUserEvalIdAsync(int evalId, string userId)
         {
             var userEvaluation = await _context.UserEvaluations
@@ -120,7 +172,7 @@ namespace EvaluationService.Controllers
         }
 
         [HttpGet("userObjectif")]
-        public async Task<ActionResult<List<UserObjective>>> GetUserObjectivesAsync(int evalId, string userId)
+        public async Task<ActionResult<List<UserObjectiveDto>>> GetUserObjectivesAsync(int evalId, string userId)
         {
             try
             {
@@ -131,14 +183,43 @@ namespace EvaluationService.Controllers
                     return NotFound($"UserEvalId introuvable pour evalId '{evalId}' et userId '{userId}'.");
                 }
 
+                // Récupérer toutes les colonnes actives
+                var allColumns = await _context.ObjectiveColumns
+                    .Where(oc => oc.IsActive)
+                    .ToListAsync();
+
                 var objectives = await _context.UserObjectives
                     .Where(uo => uo.UserEvalId == userEvalId)
                     .Include(uo => uo.TemplateStrategicPriority)
                     .Include(uo => uo.ObjectiveColumnValues)
-                        .ThenInclude(ocv => ocv.ObjectiveColumn) // Inclure le nom de la colonne
+                        .ThenInclude(ocv => ocv.ObjectiveColumn)
                     .ToListAsync();
 
-                return Ok(objectives);
+                // Mapper les UserObjectives vers UserObjectiveDto
+                var objectiveDtos = objectives.Select(obj => new UserObjectiveDto
+                {
+                    ObjectiveId = obj.ObjectiveId,
+                    Description = obj.Description,
+                    Weighting = obj.Weighting,
+                    ResultIndicator = obj.ResultIndicator,
+                    Result = (decimal)obj.Result,
+                    TemplateStrategicPriority = new TemplateStrategicPriorityDto
+                    {
+                        TemplatePriorityId = obj.TemplateStrategicPriority.TemplatePriorityId,
+                        Name = obj.TemplateStrategicPriority.Name,
+                        MaxObjectives = obj.TemplateStrategicPriority.MaxObjectives,
+                        // Ajouter d'autres propriétés si nécessaire
+                    },
+                    ObjectiveColumnValues = allColumns.Select(column => new ColumnValueDto
+                    {
+                        ColumnName = column.Name,
+                        Value = obj.ObjectiveColumnValues
+                                    .FirstOrDefault(ocv => ocv.ColumnId == column.ColumnId)?.Value
+                                    ?? string.Empty // Valeur par défaut si absente
+                    }).ToList()
+                }).ToList();
+
+                return Ok(objectiveDtos);
             }
             catch (Exception ex)
             {
@@ -146,42 +227,102 @@ namespace EvaluationService.Controllers
             }
         }
 
+        [HttpPut("userObjectif")]
+        public async Task<IActionResult> UpdateUserObjectivesAsync(int evalId, string userId, [FromBody] List<UserObjectiveDto> updatedObjectives)
+        {
+            try
+            {
+                int? userEvalId = await GetUserEvalIdAsync(evalId, userId);
+
+                if (userEvalId == null)
+                {
+                    return NotFound($"UserEvalId introuvable pour evalId '{evalId}' et userId '{userId}'.");
+                }
+
+                // Récupérer toutes les colonnes actives
+                var allColumns = await _context.ObjectiveColumns
+                    .Where(oc => oc.IsActive)
+                    .ToListAsync();
+
+                // Récupérer les UserObjectives existants pour cet UserEvalId
+                var existingObjectives = await _context.UserObjectives
+                    .Where(uo => uo.UserEvalId == userEvalId)
+                    .Include(uo => uo.ObjectiveColumnValues)
+                    .ToListAsync();
+
+                foreach (var updatedObjective in updatedObjectives)
+                {
+                    var existingObjective = existingObjectives.FirstOrDefault(obj => obj.ObjectiveId == updatedObjective.ObjectiveId);
+
+                    if (existingObjective != null)
+                    {
+                        // Mettre à jour les propriétés de l'objectif existant
+                        existingObjective.Description = updatedObjective.Description;
+                        existingObjective.Weighting = updatedObjective.Weighting;
+                        existingObjective.ResultIndicator = updatedObjective.ResultIndicator;
+                        existingObjective.Result = updatedObjective.Result;
+
+                        // Mettre à jour les ObjectiveColumnValues
+                        foreach (var column in allColumns)
+                        {
+                            var updatedColumnValue = updatedObjective.ObjectiveColumnValues
+                                .FirstOrDefault(cv => cv.ColumnName == column.Name);
+
+                            var existingColumnValue = existingObjective.ObjectiveColumnValues
+                                .FirstOrDefault(ocv => ocv.ColumnId == column.ColumnId);
+
+                            if (updatedColumnValue != null && existingColumnValue != null)
+                            {
+                                // Mettre à jour la valeur existante
+                                existingColumnValue.Value = updatedColumnValue.Value;
+                            }
+                        }
+                    }
+                }
+
+                // Sauvegarder les modifications dans la base de données
+                await _context.SaveChangesAsync();
+
+                return NoContent(); // Réponse 204 pour signaler la réussite
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Erreur lors de la mise à jour des objectifs : {ex.Message}");
+            }
+        }
+
+
 
         [HttpPost("validateUserObjectives")]
         public async Task<IActionResult> ValidateUserObjectives(string userId, string type, List<ObjectiveDto> objectives)
         {
-            // Convertir la chaîne en FormType
             if (!Enum.TryParse<FormType>(type, true, out var formType))
             {
                 return BadRequest(new { Message = "Type d'évaluation invalide. Utilisez 'Cadre' ou 'NonCadre'." });
             }
 
-            // Récupère l'ID de l'évaluation en cours pour le type spécifié
             var evaluationId = await _context.Evaluations
                 .Where(e => e.EtatId == 2 && e.FormTemplate.Type == formType)
                 .Select(e => e.EvalId)
                 .FirstOrDefaultAsync();
 
-            // Vérifie si une évaluation en cours a été trouvée
             if (evaluationId == 0)
             {
                 return NotFound(new { Message = $"Aucune évaluation en cours pour le type {type}." });
             }
 
-            // Récupère l'ID de l'évaluation utilisateur pour l'utilisateur spécifié
             var userEvalId = await GetUserEvalIdAsync(evaluationId, userId);
             if (userEvalId == null)
             {
                 return NotFound(new { Message = "Évaluation utilisateur non trouvée." });
             }
 
-            // Liste pour stocker les UserObjective créés
             var createdUserObjectives = new List<UserObjective>();
+            var createdObjectiveColumnValues = new List<ObjectiveColumnValue>();
 
-            // Traiter chaque objectif
             foreach (var objective in objectives)
             {
-                // Crée une entrée d'objectif utilisateur
+                // Création d'un UserObjective
                 var userObjective = new UserObjective
                 {
                     UserEvalId = userEvalId.Value,
@@ -189,35 +330,237 @@ namespace EvaluationService.Controllers
                     Description = objective.Description,
                     Weighting = objective.Weighting,
                     ResultIndicator = objective.ResultIndicator,
-                    Result = 0,
-                    CreatedBy = userId, // Ajoutez des informations sur l'utilisateur qui a créé
+                    Result = objective.Result,
+                    CreatedBy = userId,
                     CreatedAt = DateTime.Now
                 };
-                _context.UserObjectives.Add(userObjective);
-                await _context.SaveChangesAsync(); // Sauvegarde pour obtenir l'ObjectiveId
 
+                _context.UserObjectives.Add(userObjective);
                 createdUserObjectives.Add(userObjective);
 
-                // Traitement des colonnes dynamiques dans ObjectiveColumnValues
-                foreach (var columnValue in objective.DynamicColumns)
+                // Sauvegarder pour obtenir l'ID de UserObjective
+                await _context.SaveChangesAsync();
+
+                // Ajout des valeurs dynamiques pour les colonnes existantes
+                if (objective.DynamicColumns != null)
                 {
-                    var column = await _context.ObjectiveColumns.FirstOrDefaultAsync(c => c.Name == columnValue.ColumnName);
-                    if (column != null)
+                    foreach (var col in objective.DynamicColumns)
                     {
-                        var objectiveColumnValue = new ObjectiveColumnValue
+                        // Récupérer l'ID de la colonne existante
+                        var existingColumn = await _context.ObjectiveColumns
+                            .FirstOrDefaultAsync(c => c.Name == col.ColumnName);
+
+                        if (existingColumn == null)
+                        {
+                            // Si la colonne n'existe pas, ignorer la valeur
+                            Console.WriteLine($"Colonne dynamique inconnue : {col.ColumnName}");
+                            continue;
+                        }
+
+                        // Ajouter la valeur dans ObjectiveColumnValue
+                        var columnValue = new ObjectiveColumnValue
                         {
                             ObjectiveId = userObjective.ObjectiveId,
-                            ColumnId = column.ColumnId,
-                            Value = columnValue.Value ?? "N/A"
+                            ColumnId = existingColumn.ColumnId,
+                            Value = col.Value
                         };
-                        _context.ObjectiveColumnValues.Add(objectiveColumnValue);
+
+                        _context.ObjectiveColumnValues.Add(columnValue);
+                        createdObjectiveColumnValues.Add(columnValue);
                     }
                 }
             }
 
             await _context.SaveChangesAsync();
-            return Ok(new { Message = "Objectifs validés et enregistrés dans UserObjective.", UserObjectives = createdUserObjectives });
+
+            // Enregistrement des notifications
+            try
+            {
+                var manager = await GetManagerByUserIdAsync(userId);
+                var triggeringUser = await GetUserDetails(userId);
+
+                if (manager != null && !string.IsNullOrEmpty(manager.Id))
+                {
+                    var message = $"{triggeringUser.Name} a validé ses objectifs pour la période de Fixation des objectifs";
+
+                    var notification = new Notification
+                    {
+                        UserId = manager.Id,
+                        SenderId = userId,
+                        SenderMatricule = triggeringUser.Matricule,
+                        Message = message,
+                        IsRead = false,
+                        CreatedAt = DateTime.Now
+                    };
+
+                    _context.Notifications.Add(notification);
+                    await _context.SaveChangesAsync();
+
+                    NotificationService.Notify(manager.Id, notification);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur lors de la notification du manager : {ex.Message}");
+            }
+
+            return Ok(new
+            {
+                Message = "Objectifs validés et enregistrés.",
+                UserObjectives = createdUserObjectives,
+                ObjectiveColumnValues = createdObjectiveColumnValues
+            });
         }
+
+
+        // [HttpPost("validateUserObjectives")]
+        // public async Task<IActionResult> ValidateUserObjectives( IFormFile uploadedFile, string userId, string type, List<ObjectiveDto> objectives)
+        // {
+        //     // Vérifier si un fichier de signature est fourni
+        //     if (uploadedFile == null || uploadedFile.Length == 0)
+        //     {
+        //         return BadRequest(new { Message = "Le fichier de signature est requis pour valider les objectifs." });
+        //     }
+
+        //     // Envoyer le fichier de signature pour comparaison via API
+        //     var client = _httpClientFactory.CreateClient("UserService");
+        //     using (var content = new MultipartFormDataContent())
+        //     {
+        //         content.Add(new StreamContent(uploadedFile.OpenReadStream()), "uploadedFile", uploadedFile.FileName);
+
+        //         var response = await client.PostAsync($"api/Signature/compare-user-signature/{userId}", content);
+
+        //         if (!response.IsSuccessStatusCode)
+        //         {
+        //             return BadRequest(new { Message = "Échec de la validation de la signature. Vérifiez votre signature." });
+        //         }
+
+        //         var responseBody = await response.Content.ReadAsStringAsync();
+        //         var result = JsonSerializer.Deserialize<dynamic>(responseBody);
+        //         if (result.matchLevel != "Correspondance stricte.")
+        //         {
+        //             return BadRequest(new { Message = "Impossible de valider. La signature ne correspond pas strictement." });
+        //         }
+        //     }
+
+        //     // Si la signature est valide, continuer avec la logique existante
+        //     if (!Enum.TryParse<FormType>(type, true, out var formType))
+        //     {
+        //         return BadRequest(new { Message = "Type d'évaluation invalide. Utilisez 'Cadre' ou 'NonCadre'." });
+        //     }
+
+        //     var evaluationId = await _context.Evaluations
+        //         .Where(e => e.EtatId == 2 && e.FormTemplate.Type == formType)
+        //         .Select(e => e.EvalId)
+        //         .FirstOrDefaultAsync();
+
+        //     if (evaluationId == 0)
+        //     {
+        //         return NotFound(new { Message = $"Aucune évaluation en cours pour le type {type}." });
+        //     }
+
+        //     var userEvalId = await GetUserEvalIdAsync(evaluationId, userId);
+        //     if (userEvalId == null)
+        //     {
+        //         return NotFound(new { Message = "Évaluation utilisateur non trouvée." });
+        //     }
+
+        //     var createdUserObjectives = new List<UserObjective>();
+        //     var createdObjectiveColumnValues = new List<ObjectiveColumnValue>();
+
+        //     foreach (var objective in objectives)
+        //     {
+        //         // Création d'un UserObjective
+        //         var userObjective = new UserObjective
+        //         {
+        //             UserEvalId = userEvalId.Value,
+        //             PriorityId = objective.PriorityId,
+        //             Description = objective.Description,
+        //             Weighting = objective.Weighting,
+        //             ResultIndicator = objective.ResultIndicator,
+        //             Result = objective.Result,
+        //             CreatedBy = userId,
+        //             CreatedAt = DateTime.Now
+        //         };
+
+        //         _context.UserObjectives.Add(userObjective);
+        //         createdUserObjectives.Add(userObjective);
+
+        //         // Sauvegarder pour obtenir l'ID de UserObjective
+        //         await _context.SaveChangesAsync();
+
+        //         // Ajout des valeurs dynamiques pour les colonnes existantes
+        //         if (objective.DynamicColumns != null)
+        //         {
+        //             foreach (var col in objective.DynamicColumns)
+        //             {
+        //                 // Récupérer l'ID de la colonne existante
+        //                 var existingColumn = await _context.ObjectiveColumns
+        //                     .FirstOrDefaultAsync(c => c.Name == col.ColumnName);
+
+        //                 if (existingColumn == null)
+        //                 {
+        //                     // Si la colonne n'existe pas, ignorer la valeur
+        //                     Console.WriteLine($"Colonne dynamique inconnue : {col.ColumnName}");
+        //                     continue;
+        //                 }
+
+        //                 // Ajouter la valeur dans ObjectiveColumnValue
+        //                 var columnValue = new ObjectiveColumnValue
+        //                 {
+        //                     ObjectiveId = userObjective.ObjectiveId,
+        //                     ColumnId = existingColumn.ColumnId,
+        //                     Value = col.Value
+        //                 };
+
+        //                 _context.ObjectiveColumnValues.Add(columnValue);
+        //                 createdObjectiveColumnValues.Add(columnValue);
+        //             }
+        //         }
+        //     }
+
+        //     await _context.SaveChangesAsync();
+
+        //     // Enregistrement des notifications
+        //     try
+        //     {
+        //         var manager = await GetManagerByUserIdAsync(userId);
+        //         var triggeringUser = await GetUserDetails(userId);
+
+        //         if (manager != null && !string.IsNullOrEmpty(manager.Id))
+        //         {
+        //             var message = $"{triggeringUser.Name} a validé ses objectifs pour la période de Fixation des objectifs";
+
+        //             var notification = new Notification
+        //             {
+        //                 UserId = manager.Id,
+        //                 SenderId = userId,
+        //                 SenderMatricule = triggeringUser.Matricule,
+        //                 Message = message,
+        //                 IsRead = false,
+        //                 CreatedAt = DateTime.Now
+        //             };
+
+        //             _context.Notifications.Add(notification);
+        //             await _context.SaveChangesAsync();
+
+        //             NotificationService.Notify(manager.Id, notification);
+        //         }
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         Console.WriteLine($"Erreur lors de la notification du manager : {ex.Message}");
+        //     }
+
+        //     return Ok(new
+        //     {
+        //         Message = "Objectifs validés et enregistrés.",
+        //         UserObjectives = createdUserObjectives,
+        //         ObjectiveColumnValues = createdObjectiveColumnValues
+        //     });
+        // }
+
+
 
         [HttpPost("validateUserObjectivesHistory")]
         public async Task<IActionResult> ValidateUserObjectivesHistory(
@@ -317,6 +660,7 @@ namespace EvaluationService.Controllers
                         PriorityName = userObjective.TemplateStrategicPriority.Name,
                         Description = userObjective.Description,
                         Weighting = userObjective.Weighting,
+                        ResultIndicator = userObjective.ResultIndicator,
                         CreatedAt = DateTime.Now,
                         ValidatedBy = validatorUserId
                     };
@@ -344,6 +688,39 @@ namespace EvaluationService.Controllers
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
+                try
+                {
+                    var manager = await GetManagerByUserIdAsync(userId);
+                    var triggeringUser = await GetUserDetails(userId); // Utilisation de la méthode existante
+
+                    if (manager != null && !string.IsNullOrEmpty(manager.Id))
+                    {
+                        var message = $"{manager.Name} a validé vos objectifs pour la période de Fixation des objectifs";
+
+                        // Enregistrer la notification dans la base de données
+                        var notification = new Notification
+                        {
+                            UserId = userId,
+                            SenderId = manager.Id,
+                            SenderMatricule = manager.Matricule,
+                            Message = message,
+                            IsRead = false,
+                            CreatedAt = DateTime.Now
+                        };
+
+                        _context.Notifications.Add(notification);
+                        await _context.SaveChangesAsync();
+
+                        NotificationService.Notify(userId, notification);
+
+                        Console.WriteLine($"Notification envoyée et stockée pour le manager : {manager.Name}.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Erreur lors de la notification du manager : {ex.Message}");
+                }
+
                 return Ok(new
                 {
                     Message = "Validation effectuée et historique enregistré.",
@@ -354,6 +731,7 @@ namespace EvaluationService.Controllers
                         h.PriorityName,
                         h.Description,
                         h.Weighting,
+                        h.ResultIndicator,
                         h.ValidatedBy,
                         h.CreatedAt
                     }).ToList(),
@@ -366,6 +744,8 @@ namespace EvaluationService.Controllers
                     }).ToList()
                 });
             }
+
+
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
@@ -530,6 +910,39 @@ namespace EvaluationService.Controllers
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
+                try
+                {
+                    var manager = await GetManagerByUserIdAsync(userId);
+                    var triggeringUser = await GetUserDetails(userId); // Utilisation de la méthode existante
+
+                    if (manager != null && !string.IsNullOrEmpty(manager.Id))
+                    {
+                        var message = $"{manager.Name} a validé vos résultats pour la période d'évaluation Mi-parcours";
+
+                        // Enregistrer la notification dans la base de données
+                        var notification = new Notification
+                        {
+                            UserId = userId,
+                            SenderId = manager.Id,
+                            SenderMatricule = manager.Matricule,
+                            Message = message,
+                            IsRead = false,
+                            CreatedAt = DateTime.Now
+                        };
+
+                        _context.Notifications.Add(notification);
+                        await _context.SaveChangesAsync();
+
+                        NotificationService.Notify(userId, notification);
+
+                        Console.WriteLine($"Notification envoyée et stockée pour le manager : {manager.Name}.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Erreur lors de la notification du manager : {ex.Message}");
+                }
+
                 return Ok(new { Message = "Mise à jour des objectifs et colonnes dynamiques effectuée avec succès." });
             }
             catch (Exception ex)
@@ -607,6 +1020,39 @@ namespace EvaluationService.Controllers
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
+
+                try
+                {
+                    var manager = await GetManagerByUserIdAsync(userId);
+                    var triggeringUser = await GetUserDetails(userId); // Utilisation de la méthode existante
+
+                    if (manager != null && !string.IsNullOrEmpty(manager.Id))
+                    {
+                        var message = $"{triggeringUser.Name} a validé ses résultats pour la période d'évaluation Mi-parcours";
+
+                        // Enregistrer la notification dans la base de données
+                        var notification = new Notification
+                        {
+                            UserId = manager.Id,
+                            SenderId = userId,
+                            SenderMatricule = triggeringUser.Matricule,
+                            Message = message,
+                            IsRead = false,
+                            CreatedAt = DateTime.Now
+                        };
+
+                        _context.Notifications.Add(notification);
+                        await _context.SaveChangesAsync();
+
+                        NotificationService.Notify(manager.Id, notification);
+
+                        Console.WriteLine($"Notification envoyée et stockée pour le manager : {manager.Name}.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Erreur lors de la notification du manager : {ex.Message}");
+                }
 
                 return Ok(new { Message = "Validation effectuée et historique ajouté avec succès." });
             }
@@ -752,6 +1198,39 @@ namespace EvaluationService.Controllers
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
+                try
+                {
+                    var manager = await GetManagerByUserIdAsync(userId);
+                    var triggeringUser = await GetUserDetails(userId); // Utilisation de la méthode existante
+
+                    if (manager != null && !string.IsNullOrEmpty(manager.Id))
+                    {
+                        var message = $"{manager.Name} a validé vos résultats pour la période d'évaluation final";
+
+                        // Enregistrer la notification dans la base de données
+                        var notification = new Notification
+                        {
+                            UserId = userId,
+                            SenderId = manager.Id,
+                            SenderMatricule = manager.Matricule,
+                            Message = message,
+                            IsRead = false,
+                            CreatedAt = DateTime.Now
+                        };
+
+                        _context.Notifications.Add(notification);
+                        await _context.SaveChangesAsync();
+
+                        NotificationService.Notify(userId, notification);
+
+                        Console.WriteLine($"Notification envoyée et stockée pour le manager : {manager.Name}.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Erreur lors de la notification du manager : {ex.Message}");
+                }
+
                 return Ok(new { Message = "Mise à jour des colonnes et des résultats effectuée avec succès." });
             }
             catch (Exception ex)
@@ -829,6 +1308,39 @@ namespace EvaluationService.Controllers
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
+                try
+                {
+                    var manager = await GetManagerByUserIdAsync(userId);
+                    var triggeringUser = await GetUserDetails(userId); // Utilisation de la méthode existante
+
+                    if (manager != null && !string.IsNullOrEmpty(manager.Id))
+                    {
+                        var message = $"{triggeringUser.Name} a validé ses résultats pour la période d'évaluation final";
+
+                        // Enregistrer la notification dans la base de données
+                        var notification = new Notification
+                        {
+                            UserId = manager.Id,
+                            SenderId = userId,
+                            SenderMatricule = triggeringUser.Matricule,
+                            Message = message,
+                            IsRead = false,
+                            CreatedAt = DateTime.Now
+                        };
+
+                        _context.Notifications.Add(notification);
+                        await _context.SaveChangesAsync();
+
+                        NotificationService.Notify(manager.Id, notification);
+
+                        Console.WriteLine($"Notification envoyée et stockée pour le manager : {manager.Name}.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Erreur lors de la notification du manager : {ex.Message}");
+                }
+
                 return Ok(new { Message = "Validation finale effectuée et historique ajouté avec succès." });
             }
             catch (Exception ex)
@@ -887,64 +1399,12 @@ namespace EvaluationService.Controllers
             }
 
             return Ok(history);
-        }        
+        }
 
         //-----------------------------NonCadre---------------------------------------------------------------------------------------------------
 
 
-        // [HttpGet("IndicatorValidateByUser")]
-        // public async Task<IActionResult> GetUserIndicatorsAsync(string userId, string type)
-        // {
-        //     if (!Enum.TryParse<FormType>(type, true, out var formType))
-        //     {
-        //         return BadRequest(new { Message = "Type d'évaluation invalide. Utilisez 'Cadre' ou 'NonCadre'." });
-        //     }
 
-        //     // Récupération de l'ID de l'évaluation en cours pour le type spécifié
-        //     var evaluationId = await _context.Evaluations
-        //         .Where(e => e.EtatId == 2 && e.FormTemplate.Type == formType)
-        //         .Select(e => e.EvalId)
-        //         .FirstOrDefaultAsync();
-
-        //     System.Console.WriteLine(evaluationId);
-
-
-        //     if (evaluationId == 0)
-        //     {
-        //         return NotFound(new { Message = $"Aucune évaluation en cours pour le type {type}." });
-        //     }
-
-        //     // Récupération de l'ID de l'évaluation utilisateur
-        //     var userEvalId = await GetUserEvalIdAsync(evaluationId, userId);
-        //     if (userEvalId == null)
-        //     {
-        //         return NotFound(new { Message = "Évaluation utilisateur non trouvée." });
-        //     }
-        //     System.Console.WriteLine("userEvalId" + userEvalId);
-
-        //     var userIndicators = await _context.UserIndicators
-        //         .Where(ui => ui.UserEvalId == userEvalId)
-        //         .Select(ui => new
-        //         {
-        //             UserIndicatorId = ui.UserIndicatorId,
-        //             UserEvalId = ui.UserEvalId,
-        //             Name = ui.Name,
-        //             IndicatorId = ui.Indicator.IndicatorId,
-        //             IndicatorLabel = ui.Indicator.label,
-        //             MaxResults = ui.Indicator.MaxResults,
-        //             TemplateId = ui.Indicator.TemplateId
-        //         })
-        //         .ToListAsync();
-
-
-        //     if (userIndicators == null || !userIndicators.Any())
-        //     {
-        //         return NotFound(new { Message = "Aucun indicateur trouvé pour l'utilisateur spécifié." });
-        //     }
-
-        //     // Retourne les résultats
-        //     return Ok(userIndicators);
-        // }
         [HttpGet("IndicatorValidateByUser")]
         public async Task<IActionResult> GetUserIndicatorsAsync(string userId, string type)
         {
@@ -1001,6 +1461,91 @@ namespace EvaluationService.Controllers
             return Ok(userIndicators);
         }
 
+        [HttpPut("UpdateIndicator")]
+        public async Task<IActionResult> UpdateUserIndicatorsAsync(string userId, string type, [FromBody] List<UserIndicatorDto> updatedIndicators)
+        {
+            if (!Enum.TryParse<FormType>(type, true, out var formType))
+            {
+                return BadRequest(new { Message = "Type d'évaluation invalide. Utilisez 'Cadre' ou 'NonCadre'." });
+            }
+
+            // Récupération de l'ID de l'évaluation en cours pour le type spécifié
+            var evaluationId = await _context.Evaluations
+                .Where(e => e.EtatId == 2 && e.FormTemplate.Type == formType)
+                .Select(e => e.EvalId)
+                .FirstOrDefaultAsync();
+
+            if (evaluationId == 0)
+            {
+                return NotFound(new { Message = $"Aucune évaluation en cours pour le type {type}." });
+            }
+
+            // Récupération de l'ID de l'évaluation utilisateur
+            var userEvalId = await GetUserEvalIdAsync(evaluationId, userId);
+            if (userEvalId == null)
+            {
+                return NotFound(new { Message = "Évaluation utilisateur non trouvée." });
+            }
+
+            // Récupération des indicateurs utilisateur existants à mettre à jour
+            var existingIndicators = await _context.UserIndicators
+                .Where(ui => ui.UserEvalId == userEvalId && updatedIndicators.Select(u => u.UserIndicatorId).Contains(ui.UserIndicatorId))
+                .Include(ui => ui.UserIndicatorResults)
+                .ToListAsync();
+
+            if (existingIndicators == null || !existingIndicators.Any())
+            {
+                return NotFound(new { Message = "Aucun indicateur trouvé pour l'utilisateur spécifié." });
+            }
+
+            // Parcours des indicateurs mis à jour
+            foreach (var updatedIndicator in updatedIndicators)
+            {
+                var existingIndicator = existingIndicators.FirstOrDefault(ui => ui.UserIndicatorId == updatedIndicator.UserIndicatorId);
+                if (existingIndicator != null)
+                {
+                    // Mise à jour des propriétés de l'indicateur
+                    existingIndicator.Name = updatedIndicator.Name;
+                    // Ajoutez d'autres propriétés de UserIndicator à mettre à jour si nécessaire
+
+                    // Parcours des résultats de l'indicateur
+                    foreach (var updatedResult in updatedIndicator.UserIndicatorResults)
+                    {
+                        var existingResult = existingIndicator.UserIndicatorResults
+                            .FirstOrDefault(uir => uir.ResultId == updatedResult.ResultId);
+
+                        if (existingResult != null)
+                        {
+                            // Mise à jour des propriétés du résultat
+                            existingResult.ResultText = updatedResult.ResultText;
+                            existingResult.Result = updatedResult.Result;
+                        }
+                        else
+                        {
+                            // Si le résultat n'existe pas, l'ajouter
+                            existingIndicator.UserIndicatorResults.Add(new UserIndicatorResult
+                            {
+                                ResultText = updatedResult.ResultText,
+                                Result = updatedResult.Result
+                            });
+                        }
+                    }
+                }
+            }
+
+            // Sauvegarde des modifications dans la base de données
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex)
+            {
+                // Gérer les erreurs de mise à jour
+                return StatusCode(StatusCodes.Status500InternalServerError, new { Message = "Erreur lors de la mise à jour des indicateurs utilisateur.", Details = ex.Message });
+            }
+
+            return Ok(new { Message = "Indicateurs utilisateur mis à jour avec succès." });
+        }
 
 
         [HttpPost("ValidateIndicator")]
@@ -1044,7 +1589,52 @@ namespace EvaluationService.Controllers
                         Name = indicator.IndicatorName
                     };
                     _context.UserIndicators.Add(userIndicator);
-                    await _context.SaveChangesAsync();
+                    await _context.SaveChangesAsync(); // Sauvegarde pour générer l'ID
+
+                    // Insérer les résultats associés dans UserIndicatorResult
+                    if (indicator.Results != null)
+                    {
+                        foreach (var result in indicator.Results)
+                        {
+                            var userIndicatorResult = new UserIndicatorResult
+                            {
+                                UserIndicatorId = userIndicator.UserIndicatorId,
+                                ResultText = result.ResultText, 
+                                Result = result.Result,
+                            };
+                            _context.UserIndicatorResults.Add(userIndicatorResult);
+                        }
+                    }
+                }
+
+                try
+                {
+                    var manager = await GetManagerByUserIdAsync(userId);
+                    var triggeringUser = await GetUserDetails(userId);
+
+                    if (manager != null && !string.IsNullOrEmpty(manager.Id))
+                    {
+                        var message = $"{triggeringUser.Name} a validé ses objectifs pour la période de Fixation des objectifs";
+
+                        var notification = new Notification
+                        {
+                            UserId = manager.Id,
+                            SenderId = userId,
+                            SenderMatricule = triggeringUser.Matricule,
+                            Message = message,
+                            IsRead = false,
+                            CreatedAt = DateTime.Now
+                        };
+
+                        _context.Notifications.Add(notification);
+                        await _context.SaveChangesAsync();
+
+                        NotificationService.Notify(manager.Id, notification);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Erreur lors de la notification du manager : {ex.Message}");
                 }
 
                 await _context.SaveChangesAsync();
@@ -1099,7 +1689,7 @@ namespace EvaluationService.Controllers
         //             return NotFound(new { Message = "Aucun UserIndicator trouvé pour cet utilisateur et cette évaluation." });
         //         }
 
-        //         // Parcourir les indicateurs existants pour mise à jour et ajout à l'historique
+        //         // Parcourir les indicateurs existants pour mise à jour et ajout des résultats à l'historique
         //         foreach (var existingIndicator in existingIndicators)
         //         {
         //             // Vérifier si l'indicateur est présent dans les données fournies
@@ -1112,23 +1702,40 @@ namespace EvaluationService.Controllers
         //                 _context.UserIndicators.Update(existingIndicator);
         //             }
 
-        //             // Insérer dans l'historique
-        //             var historyUserIndicator = new HistoryUserIndicatorFO
+        //             // Parcourir les résultats associés à cet indicateur et les insérer dans l'historique
+        //             if (updatedIndicator?.Results != null)
         //             {
-        //                 UserEvalId = userEvalId.Value,
-        //                 Name = existingIndicator.Name, // Nom après mise à jour (le cas échéant)
-        //                 ResultText = "N/A", // Valeur par défaut
-        //                 Result = 0, // Valeur par défaut
-        //                 ValidatedBy = validateUserId, // Utilisateur validateur
-        //                 CreatedAt = DateTime.UtcNow
-        //             };
-        //             _context.HistoryUserIndicatorFOs.Add(historyUserIndicator);
+        //                 foreach (var result in updatedIndicator.Results)
+        //                 {
+        //                     var userIndicatorResult = new UserIndicatorResult
+        //                     {
+        //                         UserIndicatorId = existingIndicator.UserIndicatorId,
+        //                         ResultText = result.ResultText ?? "N/A", // Utiliser une valeur par défaut si null
+        //                         Result = 0 // Utiliser une valeur par défaut si null
+        //                     };
+
+        //                     _context.UserIndicatorResults.Add(userIndicatorResult);
+
+        //                     // Ajouter dans l'historique également
+        //                     var historyUserIndicator = new HistoryUserIndicatorFO
+        //                     {
+        //                         UserEvalId = userEvalId.Value,
+        //                         Name = existingIndicator.Name,
+        //                         ResultText = result.ResultText ?? "N/A",
+        //                         Result = 0,
+        //                         ValidatedBy = validateUserId,
+        //                         CreatedAt = DateTime.UtcNow
+        //                     };
+
+        //                     _context.HistoryUserIndicatorFOs.Add(historyUserIndicator);
+        //                 }
+        //             }
         //         }
 
         //         // Sauvegarder les mises à jour et les ajouts dans l'historique
         //         await _context.SaveChangesAsync();
 
-        //         return Ok(new { Message = "Tous les UserIndicators correspondants ont été mis à jour et ajoutés dans l'historique avec succès." });
+        //         return Ok(new { Message = "Tous les UserIndicators et leurs résultats ont été mis à jour et ajoutés dans l'historique avec succès." });
         //     }
         //     catch (Exception ex)
         //     {
@@ -1142,6 +1749,125 @@ namespace EvaluationService.Controllers
             string validateUserId,
             string type,
             [FromBody] List<IndicatorDto> indicators)
+        {
+            // 1. Valider le type d'évaluation
+            if (!Enum.TryParse<FormType>(type, true, out var formType))
+            {
+                return BadRequest(new { Message = "Type d'évaluation invalide. Utilisez 'Cadre' ou 'NonCadre'." });
+            }
+
+            // 2. Récupérer l'ID de l'évaluation en cours pour le type spécifié
+            var evaluationId = await _context.Evaluations
+                .Where(e => e.EtatId == 2 && e.FormTemplate.Type == formType)
+                .Select(e => e.EvalId)
+                .FirstOrDefaultAsync();
+
+            if (evaluationId == 0)
+            {
+                return NotFound(new { Message = $"Aucune évaluation en cours pour le type {type}." });
+            }
+
+            // 3. Récupérer l'ID de l'évaluation utilisateur pour l'utilisateur spécifié
+            var userEvalId = await GetUserEvalIdAsync(evaluationId, userId);
+            if (userEvalId == null)
+            {
+                return NotFound(new { Message = "Évaluation utilisateur non trouvée." });
+            }
+
+            try
+            {
+                // 4. Récupérer tous les UserIndicators pour cet utilisateur et cette évaluation
+                var existingIndicators = await _context.UserIndicators
+                    .Where(ui => ui.UserEvalId == userEvalId.Value)
+                    .ToListAsync();
+
+                if (!existingIndicators.Any())
+                {
+                    return NotFound(new { Message = "Aucun UserIndicator trouvé pour cet utilisateur et cette évaluation." });
+                }
+
+                // Liste pour stocker les nouvelles entrées d'historique
+                var historyEntries = new List<HistoryUserIndicatorFO>();
+
+                // 5. Parcourir les indicateurs reçus pour mise à jour
+                foreach (var indicatorDto in indicators)
+                {
+                    // Trouver l'indicateur existant correspondant
+                    var existingIndicator = existingIndicators
+                        .FirstOrDefault(ei => ei.IndicatorId == indicatorDto.IndicatorId);
+
+                    if (existingIndicator == null)
+                    {
+                        // Indicateur non trouvé, passer au suivant
+                        continue;
+                    }
+
+                    // Mettre à jour le nom de l'indicateur si nécessaire
+                    if (existingIndicator.Name != indicatorDto.IndicatorName)
+                    {
+                        existingIndicator.Name = indicatorDto.IndicatorName;
+                        _context.UserIndicators.Update(existingIndicator);
+                    }
+
+                    // Récupérer les UserIndicatorResults existants pour cet indicateur, ordonnés par ID
+                    var existingResults = await _context.UserIndicatorResults
+                        .Where(uir => uir.UserIndicatorId == existingIndicator.UserIndicatorId)
+                        .OrderBy(uir => uir.ResultId)
+                        .ToListAsync();
+
+                    // Vérifier que le nombre de résultats reçus correspond au nombre existant
+                    if (indicatorDto.Results.Count != existingResults.Count)
+                    {
+                        return BadRequest(new { Message = $"Le nombre de résultats pour l'indicateur ID {indicatorDto.IndicatorId} ne correspond pas au nombre de résultats existants." });
+                    }
+
+                    // Mettre à jour chaque résultat
+                    for (int i = 0; i < indicatorDto.Results.Count; i++)
+                    {
+                        var updatedResult = indicatorDto.Results[i];
+                        var existingResult = existingResults[i];
+
+                        // Mettre à jour les propriétés du résultat existant
+                        existingResult.ResultText = updatedResult.ResultText;
+                        existingResult.Result = updatedResult.Result;
+                        _context.UserIndicatorResults.Update(existingResult);
+
+                        // Créer une entrée dans l'historique
+                        var historyEntry = new HistoryUserIndicatorFO
+                        {
+                            UserEvalId = userEvalId.Value,
+                            Name = existingIndicator.Name,
+                            ResultText = updatedResult.ResultText ?? string.Empty, // Assurer que ResultText n'est pas null
+                            Result = updatedResult.Result,
+                            ValidatedBy = validateUserId,
+                            CreatedAt = DateTime.UtcNow
+                        };
+
+                        historyEntries.Add(historyEntry);
+                    }
+                }
+
+                // 6. Ajouter toutes les entrées d'historique
+                if (historyEntries.Any())
+                {
+                    _context.HistoryUserIndicatorFOs.AddRange(historyEntries);
+                }
+
+                // Sauvegarder les changements
+                await _context.SaveChangesAsync();
+
+                return Ok(new { Message = "Tous les UserIndicators et leurs résultats ont été mis à jour et ajoutés dans l'historique avec succès." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = $"Une erreur est survenue : {ex.Message}" });
+            }
+        }
+
+
+
+        [HttpGet("GetHistoryUserIndicatorFo")]
+        public async Task<IActionResult> GetHistoryUserIndicatorFo(string userId, string type)
         {
             if (!Enum.TryParse<FormType>(type, true, out var formType))
             {
@@ -1168,63 +1894,28 @@ namespace EvaluationService.Controllers
 
             try
             {
-                // Récupérer tous les UserIndicators pour cet utilisateur et cette évaluation
-                var existingIndicators = await _context.UserIndicators
-                    .Where(ui => ui.UserEvalId == userEvalId.Value)
+                // Récupérer les enregistrements de la table HistoryUserIndicatorFo pour le userEvalId
+                var historyRecords = await _context.HistoryUserIndicatorFOs
+                    .Where(history => history.UserEvalId == userEvalId.Value)
+                    .Select(history => new
+                    {
+                        history.HistoryUserIndicatorFOId,
+                        history.UserEvalId,
+                        history.Name,
+                        history.ResultText,
+                        history.Result,
+                        history.ValidatedBy,
+                        history.CreatedAt
+                    })
                     .ToListAsync();
 
-                if (!existingIndicators.Any())
+                if (!historyRecords.Any())
                 {
-                    return NotFound(new { Message = "Aucun UserIndicator trouvé pour cet utilisateur et cette évaluation." });
+                    return NotFound(new { Message = "Aucun enregistrement trouvé pour cet utilisateur et cette évaluation." });
                 }
 
-                // Parcourir les indicateurs existants pour mise à jour et ajout des résultats à l'historique
-                foreach (var existingIndicator in existingIndicators)
-                {
-                    // Vérifier si l'indicateur est présent dans les données fournies
-                    var updatedIndicator = indicators.FirstOrDefault(ind => ind.IndicatorId == existingIndicator.IndicatorId);
-
-                    // Mise à jour si nécessaire
-                    if (updatedIndicator != null && existingIndicator.Name != updatedIndicator.IndicatorName)
-                    {
-                        existingIndicator.Name = updatedIndicator.IndicatorName;
-                        _context.UserIndicators.Update(existingIndicator);
-                    }
-
-                    // Parcourir les résultats associés à cet indicateur et les insérer dans l'historique
-                    if (updatedIndicator?.Results != null)
-                    {
-                        foreach (var result in updatedIndicator.Results)
-                        {
-                            var userIndicatorResult = new UserIndicatorResult
-                            {
-                                UserIndicatorId = existingIndicator.UserIndicatorId,
-                                ResultText = result.ResultText ?? "N/A", // Utiliser une valeur par défaut si null
-                                Result = 0 // Utiliser une valeur par défaut si null
-                            };
-
-                            _context.UserIndicatorResults.Add(userIndicatorResult);
-
-                            // Ajouter dans l'historique également
-                            var historyUserIndicator = new HistoryUserIndicatorFO
-                            {
-                                UserEvalId = userEvalId.Value,
-                                Name = existingIndicator.Name,
-                                ResultText = result.ResultText ?? "N/A",
-                                Result = 0,
-                                ValidatedBy = validateUserId,
-                                CreatedAt = DateTime.UtcNow
-                            };
-
-                            _context.HistoryUserIndicatorFOs.Add(historyUserIndicator);
-                        }
-                    }
-                }
-
-                // Sauvegarder les mises à jour et les ajouts dans l'historique
-                await _context.SaveChangesAsync();
-
-                return Ok(new { Message = "Tous les UserIndicators et leurs résultats ont été mis à jour et ajoutés dans l'historique avec succès." });
+                // Retourner les données récupérées
+                return Ok(historyRecords);
             }
             catch (Exception ex)
             {
@@ -1395,6 +2086,111 @@ namespace EvaluationService.Controllers
             }
         }
 
+        [HttpPut("UpdateMidtermObjectifNoncadre")]
+        public async Task<IActionResult> UpdateUserEvaluation(string userId, string type, [FromBody] MiParcoursDataDto miParcoursData)
+        {
+            // Validation du type d'évaluation
+            if (!Enum.TryParse<FormType>(type, true, out var formType))
+            {
+                return BadRequest(new { Message = "Type d'évaluation invalide. Utilisez 'Cadre' ou 'NonCadre'." });
+            }
+
+            // Récupère l'ID de l'évaluation en cours pour le type spécifié
+            var evaluationId = await _context.Evaluations
+                .Where(e => e.EtatId == 2 && e.FormTemplate.Type == formType)
+                .Select(e => e.EvalId)
+                .FirstOrDefaultAsync();
+
+            // Vérifie si une évaluation en cours a été trouvée
+            if (evaluationId == 0)
+            {
+                return NotFound(new { Message = $"Aucune évaluation en cours pour le type {type}." });
+            }
+
+            // Récupère l'ID de l'évaluation utilisateur pour l'utilisateur spécifié
+            var userEvalId = await GetUserEvalIdAsync(evaluationId, userId);
+            if (userEvalId == null)
+            {
+                return NotFound(new { Message = "Évaluation utilisateur non trouvée." });
+            }
+
+            using (var transaction = await _context.Database.BeginTransactionAsync())
+            {
+                try
+                {
+                    // Mise à jour de UserCompetence
+                    foreach (var competence in miParcoursData.Competences)
+                    {
+                        var existingUserCompetence = await _context.UserCompetences
+                            .FirstOrDefaultAsync(uc => uc.UserEvalId == userEvalId.Value && uc.CompetenceId == competence.CompetenceId);
+
+                        if (existingUserCompetence != null)
+                        {
+                            // Mise à jour de la performance
+                            existingUserCompetence.Performance = competence.Performance;
+                            _context.UserCompetences.Update(existingUserCompetence);
+                        }
+                        else
+                        {
+                            // Si la compétence n'existe pas, retournez une erreur ou gérez-la autrement
+                            return BadRequest(new { Message = $"UserCompetence non trouvée pour CompetenceId {competence.CompetenceId}." });
+                        }
+                    }
+
+                    // Mise à jour de UserIndicator et UserIndicatorResult
+                    foreach (var indicator in miParcoursData.Indicators)
+                    {
+                        var userIndicator = await _context.UserIndicators
+                            .FirstOrDefaultAsync(ui => ui.UserEvalId == userEvalId.Value && ui.IndicatorId == indicator.IndicatorId);
+
+                        if (userIndicator == null)
+                        {
+                            return NotFound(new { Message = $"UserIndicator non trouvée pour IndicatorId {indicator.IndicatorId}." });
+                        }
+
+                        // Mise à jour du nom de l'indicateur
+                        userIndicator.Name = indicator.IndicatorName;
+                        _context.UserIndicators.Update(userIndicator);
+
+                        // Supprimer les anciens résultats pour cet indicateur
+                        var existingResults = await _context.UserIndicatorResults
+                            .Where(r => r.UserIndicatorId == userIndicator.UserIndicatorId)
+                            .ToListAsync();
+
+                        if (existingResults.Any())
+                        {
+                            _context.UserIndicatorResults.RemoveRange(existingResults);
+                        }
+
+                        // Insertion des nouveaux résultats
+                        foreach (var result in indicator.Results)
+                        {
+                            var newResult = new UserIndicatorResult
+                            {
+                                UserIndicatorId = userIndicator.UserIndicatorId,
+                                ResultText = result.ResultText,
+                                Result = result.Result
+                            };
+                            _context.UserIndicatorResults.Add(newResult);
+                        }
+                    }
+
+                    // Sauvegarde des modifications dans la base de données
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+
+                    return Ok(new { Message = "Données mises à jour avec succès." });
+                }
+                catch (Exception ex)
+                {
+                    // Rollback de la transaction en cas d'erreur
+                    await transaction.RollbackAsync();
+                    return BadRequest(new { Message = $"Une erreur s'est produite : {ex.Message}" });
+                }
+            }
+        }
+
+
         [HttpGet("IsResultValidateByManager")]
         public async Task<IActionResult> VerifyEvaluationDataAsync(string userId, string type)
         {
@@ -1422,38 +2218,55 @@ namespace EvaluationService.Controllers
                 return NotFound(new { Message = "Évaluation utilisateur non trouvée." });
             }
 
+            // Récupère les compétences de l'utilisateur
             var competences = await _context.UserCompetences
                 .Where(uc => uc.UserEvalId == userEvalId)
                 .ToListAsync();
 
+            // Récupère les résultats des indicateurs avec les détails de UserIndicator
             var indicatorResults = await _context.UserIndicatorResults
                 .Join(_context.UserIndicators,
                     uir => uir.UserIndicatorId,
                     ui => ui.UserIndicatorId,
                     (uir, ui) => new { uir, ui })
                 .Where(joined => joined.ui.UserEvalId == userEvalId)
-                .Select(joined => joined.uir)
+                .Select(joined => new
+                {
+                    joined.uir.ResultId,
+                    joined.uir.UserIndicatorId,
+                    joined.uir.ResultText,
+                    joined.uir.Result,
+                    IndicatorId = joined.ui.IndicatorId,
+                    userIndicator = new
+                    {
+                        joined.ui.Name
+                    }
+                })
                 .ToListAsync();
 
             // Retourne les données trouvées ou null si aucune donnée n'est disponible
             return Ok(new
             {
-                Competences = competences.Any() ? competences : null,
-                IndicatorResults = indicatorResults.Any() ? indicatorResults : null
+                competences = competences.Any() ? competences : null, // camelCase
+                indicatorResults = indicatorResults.Any() ? indicatorResults : null // camelCase
             });
         }
 
 
+
         [HttpPost("ArchiveMiParcoursData")]
-        public async Task<IActionResult> ArchiveMiParcoursData(string userId, string type)
+        public async Task<IActionResult> ArchiveMiParcoursData(
+            string userId,
+            string type,
+            [FromBody] MiParcoursDataDto data)
         {
-            // 1. Validate the type parameter
+            // 1. Valider le paramètre type
             if (!Enum.TryParse<FormType>(type, true, out var formType))
             {
                 return BadRequest(new { Message = "Type d'évaluation invalide. Utilisez 'Cadre' ou 'NonCadre'." });
             }
 
-            // 2. Retrieve the current evaluation ID based on type and EtatId
+            // 2. Récupérer l'ID de l'évaluation actuelle basée sur le type et EtatId
             var evaluationId = await _context.Evaluations
                 .Where(e => e.EtatId == 2 && e.FormTemplate.Type == formType)
                 .Select(e => e.EvalId)
@@ -1464,7 +2277,7 @@ namespace EvaluationService.Controllers
                 return NotFound(new { Message = $"Aucune évaluation en cours pour le type {type}." });
             }
 
-            // 3. Retrieve the user evaluation ID for the given user and evaluation
+            // 3. Récupérer l'ID d'évaluation utilisateur pour l'utilisateur donné et l'évaluation
             var userEvalId = await GetUserEvalIdAsync(evaluationId, userId);
             if (userEvalId == null)
             {
@@ -1473,69 +2286,148 @@ namespace EvaluationService.Controllers
 
             try
             {
-                // 4. Archive UserCompetences
-                var userCompetences = await _context.UserCompetences
-                    .Where(uc => uc.UserEvalId == userEvalId.Value)
-                    .Include(uc => uc.Competence) // Assuming Competence is a navigation property
-                    .ToListAsync();
-
-                foreach (var competence in userCompetences)
+                // 4. Préparer les Compétences
+                if (data.Competences != null && data.Competences.Any())
                 {
-                    var historyCompetence = new HistoryUserCompetenceMP
+                    // Récupérer les noms des compétences en une seule requête pour optimiser les performances
+                    var competenceIds = data.Competences.Select(c => c.CompetenceId).Distinct().ToList();
+                    var competencesFromDb = await _context.Competences
+                        .Where(c => competenceIds.Contains(c.CompetenceId))
+                        .ToDictionaryAsync(c => c.CompetenceId, c => c.Name);
+
+                    foreach (var competenceDto in data.Competences)
                     {
-                        UserEvalId = competence.UserEvalId,
-                        CompetenceName = competence.Competence != null ? competence.Competence.Name : "N/A", // Adjust based on your Competence model
-                        Performance = competence.Performance
-                    };
-                    _context.HistoryUserCompetenceMPs.Add(historyCompetence);
+                        if (!competencesFromDb.TryGetValue(competenceDto.CompetenceId, out var competenceName))
+                        {
+                            return BadRequest(new { Message = $"Compétence avec l'ID {competenceDto.CompetenceId} non trouvée." });
+                        }
+
+                        var historyCompetence = new HistoryUserCompetenceMP
+                        {
+                            UserEvalId = userEvalId.Value,
+                            CompetenceName = competenceName,
+                            Performance = competenceDto.Performance
+                        };
+                        _context.HistoryUserCompetenceMPs.Add(historyCompetence);
+                    }
                 }
 
-                // 5. Archive UserIndicators and UserIndicatorResults
-                var userIndicators = await _context.UserIndicators
-                    .Where(ui => ui.UserEvalId == userEvalId.Value)
-                    .Include(ui => ui.UserIndicatorResults)
-                    .ToListAsync();
-
-                foreach (var indicator in userIndicators)
+                // 5. Préparer les Indicateurs
+                if (data.Indicators != null && data.Indicators.Any())
                 {
-                    if (indicator.UserIndicatorResults != null && indicator.UserIndicatorResults.Any())
+                    foreach (var indicatorDto in data.Indicators)
                     {
-                        foreach (var result in indicator.UserIndicatorResults)
+                        // Vérifier si des résultats sont fournis
+                        if (indicatorDto.Results != null && indicatorDto.Results.Any())
                         {
+                            foreach (var resultDto in indicatorDto.Results)
+                            {
+                                var historyIndicator = new HistoryUserIndicatorMP
+                                {
+                                    UserEvalId = userEvalId.Value,
+                                    Name = indicatorDto.IndicatorName,
+                                    ResultText = resultDto.ResultText,
+                                    Result = resultDto.Result
+                                };
+                                _context.HistoryUserIndicatorMPs.Add(historyIndicator);
+                            }
+                        }
+                        else
+                        {
+                            // Si aucun résultat n'est fourni pour un indicateur, archiver avec des valeurs par défaut
                             var historyIndicator = new HistoryUserIndicatorMP
                             {
-                                UserEvalId = indicator.UserEvalId,
-                                Name = indicator.Name,
-                                ResultText = result.ResultText,
-                                Result = result.Result
+                                UserEvalId = userEvalId.Value,
+                                Name = indicatorDto.IndicatorName,
+                                ResultText = "Aucun résultat disponible.",
+                                Result = 0 // Valeur par défaut
                             };
                             _context.HistoryUserIndicatorMPs.Add(historyIndicator);
                         }
                     }
-                    else
-                    {
-                        // If there are no results, you might still want to archive the indicator with default values
-                        var historyIndicator = new HistoryUserIndicatorMP
-                        {
-                            UserEvalId = indicator.UserEvalId,
-                            Name = indicator.Name,
-                            ResultText = "Aucun résultat disponible.",
-                            Result = 0 // Or any default value you deem appropriate
-                        };
-                        _context.HistoryUserIndicatorMPs.Add(historyIndicator);
-                    }
                 }
 
-                // 6. Save all changes to the database
+                // 6. Enregistrer les modifications dans la base de données
                 await _context.SaveChangesAsync();
 
                 return Ok("Données archivées avec succès.");
             }
             catch (Exception ex)
             {
-                // Log the exception (you can use a logging framework here)
+                // Journaliser l'exception (vous pouvez utiliser un framework de logging ici)
                 Console.Error.WriteLine($"Erreur lors de l'archivage des données Mi-Parcours: {ex.Message}");
                 return BadRequest(new { Message = $"Une erreur est survenue lors de l'archivage: {ex.Message}" });
+            }
+        }
+
+        [HttpGet("GetArchivedDataMp")]
+        public async Task<IActionResult> GetArchivedData([FromQuery] string userId, [FromQuery] string type)
+        {
+            // 1. Valider le paramètre type
+            if (!Enum.TryParse<FormType>(type, true, out var formType))
+            {
+                return BadRequest(new { Message = "Type d'évaluation invalide. Utilisez 'Cadre' ou 'NonCadre'." });
+            }
+
+            // 2. Récupérer l'ID de l'évaluation actuelle basée sur le type et EtatId
+            var evaluationId = await _context.Evaluations
+                .Where(e => e.EtatId == 2 && e.FormTemplate.Type == formType)
+                .Select(e => e.EvalId)
+                .FirstOrDefaultAsync();
+
+            if (evaluationId == 0)
+            {
+                return NotFound(new { Message = $"Aucune évaluation en cours pour le type {type}." });
+            }
+
+            // 3. Récupérer l'ID d'évaluation utilisateur pour l'utilisateur donné et l'évaluation
+            var userEvalId = await GetUserEvalIdAsync(evaluationId, userId);
+            if (userEvalId == null)
+            {
+                return NotFound(new { Message = "Évaluation utilisateur non trouvée." });
+            }
+
+            try
+            {
+                // 4. Récupérer les données archivées des Compétences
+                var archivedCompetences = await _context.HistoryUserCompetenceMPs
+                    .Where(hc => hc.UserEvalId == userEvalId.Value)
+                    .Select(hc => new HistoryUserCompetenceMPDto
+                    {
+                        HistoryUserCompetenceId = hc.HistoryUserCompetenceId,
+                        UserEvalId = hc.UserEvalId,
+                        CompetenceName = hc.CompetenceName,
+                        Performance = hc.Performance
+                    })
+                    .ToListAsync();
+
+                // 5. Récupérer les données archivées des Indicateurs
+                var archivedIndicators = await _context.HistoryUserIndicatorMPs
+                    .Where(hi => hi.UserEvalId == userEvalId.Value)
+                    .Select(hi => new HistoryUserIndicatorMPDto
+                    {
+                        HistoryUserIndicatorMPId = hi.HistoryUserIndicatorMPId,
+                        UserEvalId = hi.UserEvalId,
+                        Name = hi.Name,
+                        ResultText = hi.ResultText,
+                        Result = hi.Result
+                    })
+                    .ToListAsync();
+
+                // 6. Préparer la réponse
+                var result = new ArchivedDataDto
+                {
+                    Competences = archivedCompetences,
+                    Indicators = archivedIndicators
+                };
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                // Journaliser l'exception (vous pouvez utiliser un framework de logging ici)
+                Console.Error.WriteLine($"Erreur lors de la récupération des données archivées: {ex.Message}");
+                return StatusCode(500, new { Message = "Une erreur interne est survenue." });
             }
         }
 
@@ -1585,6 +2477,57 @@ namespace EvaluationService.Controllers
                 Indicators = indicators
             });
         }
+
+        [HttpPost("UpdateUserIndicatorResults")]
+        public async Task<IActionResult> UpdateUserIndicatorResults(
+            int userIndicatorId,
+            [FromBody] List<UserIndicatorResultDto> updatedResults)
+        {
+            if (updatedResults == null || !updatedResults.Any())
+            {
+                return BadRequest(new { Message = "La liste des résultats est vide ou invalide." });
+            }
+
+            try
+            {
+                // Récupérer les résultats existants pour le UserIndicatorId spécifié
+                var existingResults = await _context.UserIndicatorResults
+                    .Where(uir => uir.UserIndicatorId == userIndicatorId)
+                    .ToListAsync();
+
+                if (!existingResults.Any())
+                {
+                    return NotFound(new { Message = "Aucun résultat trouvé pour le UserIndicator spécifié." });
+                }
+
+                // Mettre à jour les résultats existants
+                foreach (var resultDto in updatedResults)
+                {
+                    var existingResult = existingResults
+                        .FirstOrDefault(uir => uir.ResultId == resultDto.ResultId);
+
+                    if (existingResult == null)
+                    {
+                        return NotFound(new { Message = $"Résultat introuvable pour ResultId {resultDto.ResultId}." });
+                    }
+
+                    // Mise à jour des valeurs
+                    existingResult.ResultText = resultDto.ResultText ?? existingResult.ResultText;
+                    existingResult.Result = resultDto.Result;
+                    _context.UserIndicatorResults.Update(existingResult);
+                }
+
+                // Sauvegarder les modifications
+                await _context.SaveChangesAsync();
+
+                return Ok(new { Message = "Résultats mis à jour avec succès." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = $"Une erreur est survenue : {ex.Message}" });
+            }
+        }
+
 
         [HttpPost("InsertHelpContentsAndArchive")]
         public async Task<IActionResult> InsertHelpContentsAndArchive([FromBody] List<UserHelpContentRequest> helpContents)
@@ -1724,50 +2667,181 @@ namespace EvaluationService.Controllers
             }
         }
 
-    }
+        [HttpPost("ValidateIndicatorFiHistory")]
+        public async Task<IActionResult> InsertHistoryUserindicatorFi(
+            string userId,
+            string validateUserId,
+            string type,
+            [FromBody] List<IndicatorDto> indicators)
+        {
+            // Validation du type d'évaluation
+            if (!Enum.TryParse<FormType>(type, true, out var formType))
+            {
+                return BadRequest(new { Message = "Type d'évaluation invalide. Utilisez 'Fi' ou un type valide." });
+            }
 
-    public class MiParcoursDataDto
-    {
-        public List<CompetenceDto> Competences { get; set; }
-        public List<IndicatorDto> Indicators { get; set; }
-    }
+            // Récupérer l'ID de l'évaluation en cours pour le type spécifié
+            var evaluationId = await _context.Evaluations
+                .Where(e => e.EtatId == 2 && e.FormTemplate.Type == formType)
+                .Select(e => e.EvalId)
+                .FirstOrDefaultAsync();
 
-    public class CompetenceDto
-    {
-        public int CompetenceId { get; set; }
-        public decimal Performance { get; set; }
-    }
+            if (evaluationId == 0)
+            {
+                return NotFound(new { Message = $"Aucune évaluation en cours pour le type {type}." });
+            }
 
-    public class IndicatorDto
-    {
-        public int IndicatorId { get; set; }
-        public string IndicatorName { get; set; }
-        public List<ResultDto> Results { get; set; }
-    }
+            // Récupérer l'ID de l'évaluation utilisateur pour l'utilisateur spécifié
+            var userEvalId = await GetUserEvalIdAsync(evaluationId, userId);
+            if (userEvalId == null)
+            {
+                return NotFound(new { Message = "Évaluation utilisateur non trouvée." });
+            }
 
-    public class ResultDto
-    {
-        public string ResultText { get; set; }
-        public decimal Result { get; set; }
-    }
+            try
+            {
+                // Récupérer tous les UserIndicators pour cet utilisateur et cette évaluation
+                var existingIndicators = await _context.UserIndicators
+                    .Where(ui => ui.UserEvalId == userEvalId.Value)
+                    .ToListAsync();
 
-    public class ModifiedUserObjectiveDto
-    {
-        public int ObjectiveId { get; set; }
-        public string indicatorName { get; set; }
-        public string? Description { get; set; }
-        public decimal? Weighting { get; set; }
-        public string? ResultIndicator { get; set; }
-        public decimal? Result { get; set; }
-        public List<ColumnValueDto>? ObjectiveColumnValues { get; set; }
-    }
+                if (!existingIndicators.Any())
+                {
+                    return NotFound(new { Message = "Aucun UserIndicator trouvé pour cet utilisateur et cette évaluation." });
+                }
 
-    public class UserHelpContentRequest
-    {
-        public string UserId { get; set; }
-        public string WriterUserId { get; set; }
-        public string Type { get; set; } // "Cadre" ou "NonCadre"
-        public int HelpId { get; set; }
-        public string Content { get; set; }
+                // Parcourir les indicateurs existants pour mise à jour et ajout des résultats à l'historique FI
+                foreach (var existingIndicator in existingIndicators)
+                {
+                    // Vérifier si l'indicateur est présent dans les données fournies
+                    var updatedIndicator = indicators.FirstOrDefault(ind => ind.IndicatorId == existingIndicator.IndicatorId);
+
+                    // Mise à jour du nom de l'indicateur si nécessaire
+                    if (updatedIndicator != null && existingIndicator.Name != updatedIndicator.IndicatorName)
+                    {
+                        existingIndicator.Name = updatedIndicator.IndicatorName;
+                        _context.UserIndicators.Update(existingIndicator);
+                    }
+
+                    // Parcourir les résultats associés à cet indicateur et les insérer dans l'historique FI
+                    if (updatedIndicator?.Results != null)
+                    {
+                        foreach (var result in updatedIndicator.Results)
+                        {
+                            var historyUserindicatorFi = new HistoryUserindicatorFi
+                            {
+                                UserEvalId = userEvalId.Value,
+                                Name = existingIndicator.Name,
+                                ResultText = result.ResultText ?? "N/A",
+                                Result = result.Result,
+                                ValidatedBy = validateUserId,
+                                CreatedAt = DateTime.UtcNow
+                            };
+
+                            _context.HistoryUserindicatorFis.Add(historyUserindicatorFi);
+                        }
+                    }
+                }
+
+                // Sauvegarder les modifications et les ajouts dans l'historique FI
+                await _context.SaveChangesAsync();
+
+                return Ok(new { Message = "Tous les indicateurs et leurs résultats ont été ajoutés dans l'historique FI avec succès." });
+            }
+            catch (Exception ex)
+            {
+                // Loggez l'exception ici si nécessaire (par exemple, avec ILogger)
+                return BadRequest(new { Message = $"Une erreur est survenue : {ex.Message}" });
+            }
+        }
+
+        public class MiParcoursDataDto
+        {
+            public List<CompetenceDto> Competences { get; set; }
+            public List<IndicatorDto> Indicators { get; set; }
+        }
+
+        public class CompetenceDto
+        {
+            public int CompetenceId { get; set; }
+            public decimal Performance { get; set; }
+        }
+
+        public class IndicatorDto
+        {
+            public int IndicatorId { get; set; }
+            public string IndicatorName { get; set; }
+            public List<ResultDto> Results { get; set; }
+        }
+
+        public class ResultDto
+        {
+            public string ResultText { get; set; }
+            public decimal Result { get; set; }
+        }
+
+        public class UserIndicatorDto
+        {
+            public int UserIndicatorId  { get; set; }
+            public string Name  { get; set; }
+            public List<UserResultDto> UserIndicatorResults  { get; set; }
+        }
+
+        public class UserResultDto
+        {
+            public int ResultId { get; set; }
+            public string ResultText { get; set; }
+            public decimal Result { get; set; }
+        }
+
+        public class ModifiedUserObjectiveDto
+        {
+            public int ObjectiveId { get; set; }
+            public string indicatorName { get; set; }
+            public string? Description { get; set; }
+            public decimal? Weighting { get; set; }
+            public string? ResultIndicator { get; set; }
+            public decimal? Result { get; set; }
+            public List<ColumnValueDto>? ObjectiveColumnValues { get; set; }
+        }
+
+        public class UserHelpContentRequest
+        {
+            public string UserId { get; set; }
+            public string WriterUserId { get; set; }
+            public string Type { get; set; } // "Cadre" ou "NonCadre"
+            public int HelpId { get; set; }
+            public string Content { get; set; }
+        }
+
+        public class UserIndicatorResultDto
+        {
+            public int ResultId { get; set; } // ID du résultat à mettre à jour
+            public string? ResultText { get; set; } // Nouveau texte du résultat
+            public decimal Result { get; set; } // Nouvelle valeur du résultat
+        }
+
+        public class HistoryUserCompetenceMPDto
+        {
+            public int HistoryUserCompetenceId { get; set; }
+            public int UserEvalId { get; set; }
+            public string CompetenceName { get; set; }
+            public decimal Performance { get; set; }
+        }
+
+        public class HistoryUserIndicatorMPDto
+        {
+            public int HistoryUserIndicatorMPId { get; set; }
+            public int UserEvalId { get; set; }
+            public string Name { get; set; }
+            public string ResultText { get; set; }
+            public decimal Result { get; set; }
+        }
+
+        public class ArchivedDataDto
+        {
+            public List<HistoryUserCompetenceMPDto> Competences { get; set; }
+            public List<HistoryUserIndicatorMPDto> Indicators { get; set; }
+        }
     }
 }

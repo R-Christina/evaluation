@@ -78,6 +78,33 @@ const Formulaire = () => {
 
   const printRef = useRef();
 
+  const [canEdit, setCanEdit] = useState(false);
+  const EDIT_FORM = 10; //modifier la formulaire d'évaluation
+
+  const checkPermissions = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const userId = user.id;
+
+      const editResponse = 
+      await formulaireInstance.get(`/Periode/test-authorization?userId=${userId}&requiredHabilitationAdminId=${EDIT_FORM}`);
+      setCanEdit(editResponse.data.hasAccess);
+      
+    } catch (error) {
+      const errorData = error.response?.data;
+      setError(
+        typeof errorData === 'object'
+          ? JSON.stringify(errorData, null, 2)
+          : 'Erreur lors de la vérification des autorisations.'
+      );
+    }
+  };
+  
+  useEffect(() => {
+    checkPermissions();
+  }, []);
+
+
   useEffect(() => {
     {
       const fetchCadreTemplateId = async () => {
@@ -392,6 +419,7 @@ const Formulaire = () => {
             </Typography>
           </Grid>
           <Grid item>
+          {canEdit && (
             <Button
               variant="outlined"
               onClick={handleEditClick}
@@ -400,6 +428,7 @@ const Formulaire = () => {
             >
               {isEditing ? 'Terminer' : 'Modifier'}
             </Button>
+          )}
             <IconButton size="small" onClick={exportPDF}>
               <FileDownloadIcon color="primary" />
             </IconButton>

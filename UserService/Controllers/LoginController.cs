@@ -96,6 +96,7 @@ namespace UserService.Controllers
                             .Select(u => new UserDTO
                             {
                                 Id = u.Id,
+                                Matricule = u.Matricule,
                                 Name = u.Name,
                                 Email = u.Email,
                                 Department = u.Department == "Direction des Systèmes d'Information" ? "DSI" : u.Department,

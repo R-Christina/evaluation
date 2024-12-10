@@ -26,97 +26,50 @@ const FixationNonCadre = () => {
   //fixation Valider
   const [isFixationvalidate, setIsFixationvalidate] = useState(null);
 
+  const [midTermCompetences, setMidTermCompetences] = useState([]);
+  const [midTermIndicators, setMidTermIndicators] = useState([]);
+
   const fetchHelps = async () => {
     const response = await formulaireInstance.get('/Archive/HelpsByAllowedUserLevel/2');
     setHelps(response.data);
   };
 
   // Récupération des indicateurs utilisateur
-  // const fetchIndicators = async () => {
-  //   try {
-  //     const response = await formulaireInstance.get(`/Evaluation/IndicatorValidateByUser`, {
-  //       params: { userId: subordinateId, type: typeUser },
-  //     });
-  
-  //     // Mappez les indicateurs pour inclure les résultats existants
-  //     const indicatorsWithResults = response.data.map((indicator) => ({
-  //       ...indicator,
-  //       results: indicator.results && indicator.results.length > 0
-  //         ? indicator.results // Utiliser les résultats existants si disponibles
-  //         : Array.from({ length: indicator.maxResults || 1 }).map(() => ({
-  //             resultText: '',
-  //             result: 0,
-  //           })), // Sinon, initialiser avec des valeurs par défaut
-  //     }));
-  
-  //     // Vérifiez si au moins un indicateur a un `resultText` non vide
-  //     const hasNonEmptyResultText = indicatorsWithResults.some((indicator) =>
-  //       indicator.results.some((result) => result.resultText && result.resultText.trim().length > 0)
-  //     );
-  
-  //     if (hasNonEmptyResultText) {
-  //       setIsFixationvalidate(true); //deja valider
-  //     } else {
-  //       setIsFixationvalidate(false); //pas encore valider
-  //     }
-  
-  //     setIndicators(indicatorsWithResults);
-  //   } catch (err) {
-  //     console.error('Erreur lors du chargement des indicateurs:', err);
-  //     setError(err.response?.data?.message || err.message || 'Erreur inconnue.');
-  //   }
-  // };
-  const fetchIndicatorsAndCompetences = async () => {
+  const fetchIndicators = async () => {
     try {
       const response = await formulaireInstance.get(`/Evaluation/IndicatorValidateByUser`, {
-        params: { userId: subordinateId, type: typeUser },
+        params: { userId: subordinateId, type: typeUser }
       });
-  
-      const competencesData = Array.isArray(response.data?.competences) ? response.data.competences : [];
-      const indicatorsData = Array.isArray(response.data?.indicators) ? response.data.indicators : [];
 
-      // Extraction des compétences
-      const competencesWithPerformance = competencesData.map((competence) => ({
-        competenceId: competence.historyUserCompetenceId,
-        name: competence.competenceName,
-        performance: competence.performance,
+      // Mappez les indicateurs pour inclure les résultats existants
+      const indicatorsWithResults = response.data.map((indicator) => ({
+        ...indicator,
+        results:
+          indicator.results && indicator.results.length > 0
+            ? indicator.results // Utiliser les résultats existants si disponibles
+            : Array.from({ length: indicator.maxResults || 1 }).map(() => ({
+                resultText: '',
+                result: 0
+              })) // Sinon, initialiser avec des valeurs par défaut
       }));
-  
-      // Extraction des indicateurs avec résultats existants ou valeurs par défaut
-      const indicatorsWithResults = indicatorsData.map((indicator) => ({
-        indicatorId: indicator.historyUserIndicatorMPId,
-        name: indicator.name,
-        results: [
-          {
-            resultText: indicator.resultText || '',
-            result: indicator.result || 0,
-          },
-        ],
-      }));
-  
-      // Vérification si au moins un indicateur ou une compétence a des valeurs remplies
+
+      // Vérifiez si au moins un indicateur a un `resultText` non vide
       const hasNonEmptyResultText = indicatorsWithResults.some((indicator) =>
-        indicator.results.some((result) => result.resultText && result.resultText.trim().length > 0),
+        indicator.results.some((result) => result.resultText && result.resultText.trim().length > 0)
       );
-  
-      const hasNonEmptyCompetencePerformance = competencesWithPerformance.some(
-        (competence) => competence.performance > 0,
-      );
-  
-      if (hasNonEmptyResultText || hasNonEmptyCompetencePerformance) {
-        setIsFixationvalidate(true); // Déjà validé
+
+      if (hasNonEmptyResultText) {
+        setIsFixationvalidate(true); //deja valider
       } else {
-        setIsFixationvalidate(false); // Pas encore validé
+        setIsFixationvalidate(false); //pas encore valider
       }
-  
+
       setIndicators(indicatorsWithResults);
-      setCompetences(competencesWithPerformance);
     } catch (err) {
-      console.error('Erreur lors du chargement des indicateurs et compétences:', err);
+      console.error('Erreur lors du chargement des indicateurs:', err);
       setError(err.response?.data?.message || err.message || 'Erreur inconnue.');
     }
-  };  
-
+  };
 
   // Récupération du TemplateId et du FormTemplate
   const fetchTemplateData = async () => {
@@ -131,7 +84,6 @@ const FixationNonCadre = () => {
     if (evalId) {
       const detailedResponse = await formulaireInstance.get(`/Template/NonCadreTemplate/${templateId}`);
       setFormTemplate(detailedResponse.data);
-
       setEvaluationId(evalId);
 
       // Récupération de la période actuelle
@@ -148,14 +100,12 @@ const FixationNonCadre = () => {
     const initializeData = async () => {
       setLoading(true);
       try {
-        await fetchTemplateData();
-        await fetchIndicatorsAndCompetences();
-        await fetchHelps();
+        await fetchTemplateData(); // Charge les métadonnées et définit `currentPeriod`
+        await fetchHelps(); // Charge les aides disponibles
         setError(null);
       } catch (err) {
         console.error('Erreur complète:', err);
-        const message = err.response?.data?.message || err.message || 'Erreur inconnue.';
-        setError(message);
+        setError(err.response?.data?.message || err.message || 'Erreur inconnue.');
       } finally {
         setLoading(false);
       }
@@ -164,28 +114,12 @@ const FixationNonCadre = () => {
     initializeData();
   }, [subordinateId, typeUser]);
 
-  // useEffect(() => {
-  //   if (evaluationId && currentPeriod === 'Fixation Objectif') {
-  //     const checkFormValidation = async () => {
-  //       try {
-  //         const response = await formulaireInstance.get(`/Archive/historyNonCadre/${subordinateId}/${evaluationId}/${currentPeriod}`);
-
-  //         if (response.status === 200 && response.data) {
-  //           setFormValidated(true);
-  //         } else {
-  //           setFormValidated(false);
-  //         }
-  //       } catch (err) {
-  //         if (err.response?.status === 404) {
-  //           setFormValidated(false);
-  //         } else {
-  //           setError(err.response?.data?.message || err.message || 'Erreur inconnue.');
-  //         }
-  //       }
-  //     };
-  //     checkFormValidation();
-  //   }
-  // }, [evaluationId, currentPeriod, subordinateId]);
+  // Charger les indicateurs après avoir défini `currentPeriod`
+  useEffect(() => {
+    if (currentPeriod === 'Fixation Objectif' || currentPeriod === 'Mi-Parcours') {
+      fetchIndicators();
+    }
+  }, [currentPeriod]);
 
   useEffect(() => {
     if (evaluationId && currentPeriod === 'Mi-Parcours') {
@@ -196,10 +130,10 @@ const FixationNonCadre = () => {
           });
 
           // Vérifie si Competences et IndicatorResults sont null
-          if (response.data?.Competences === null && response.data?.IndicatorResults === null) {
-            setFormValidated(false); // Déjà validé
+          if (response.data?.competences === null && response.data?.indicatorResults === null) {
+            setFormValidated(false); // Pas encore validé
           } else {
-            setFormValidated(true); // Pas encore validé
+            setFormValidated(true); // deja validé
           }
         } catch (err) {
           console.error('Erreur lors de la vérification des validations :', err);
@@ -259,7 +193,6 @@ const FixationNonCadre = () => {
             }))
           }))
         };
-        console.log('Payload Mi-Parcours:', payload);
 
         // Params pour Mi-Parcours
         params = {
@@ -275,6 +208,13 @@ const FixationNonCadre = () => {
       const response = await formulaireInstance.post(url, payload, { params });
 
       alert(`Validation réussie`);
+
+      if (currentPeriod === 'Fixation Objectif') {
+        setIsFixationvalidate(false); // Déjà validé
+      } else if (currentPeriod === 'Mi-Parcours') {
+        setFormValidated(true); // Déjà validé
+      }
+
     } catch (err) {
       console.error('Erreur complète:', err);
       const message = err.response?.data?.message || err.message || 'Erreur inconnue.';
@@ -319,21 +259,94 @@ const FixationNonCadre = () => {
     setIndicators(updatedIndicators);
   };
 
-  const handleSaveHelps = async () => {
+  const fetchFinalEvaluationData = async () => {
     try {
-      const payload = helps.map((help) => ({
+      const response = await formulaireInstance.get('/Evaluation/IndicatorValidateByUser', {
+        params: { userId: subordinateId, type: typeUser }
+      });
+      
+      console.log('Réponse de IndicatorValidateByUser:', response.data); // Ajoutez ceci
+  
+      // Vérifiez si la réponse contient des indicateurs
+      if (response.data && Array.isArray(response.data)) {
+        const indicatorsWithResults = response.data.map((indicator) => ({
+          ...indicator,
+          // Assurez-vous que chaque résultat a des valeurs par défaut si nécessaire
+          results: indicator.results && indicator.results.length > 0
+            ? indicator.results
+            : Array.from({ length: indicator.maxResults || 1 }).map(() => ({
+                resultText: '',
+                result: 0,
+                resultId: null // Assurez-vous d'avoir un ID unique pour chaque résultat
+              }))
+        }));
+  
+        console.log('Indicateurs avec résultats:', indicatorsWithResults); // Ajoutez ceci
+  
+        // Déterminez si le formulaire est validé
+        const hasNonEmptyResultText = indicatorsWithResults.some((indicator) =>
+          indicator.results.some((result) => result.resultText && result.resultText.trim().length > 0)
+        );
+  
+        setFormValidated(hasNonEmptyResultText);
+        setMidTermIndicators(indicatorsWithResults);
+      } else {
+        console.log('Aucun indicateur trouvé dans la réponse.'); // Ajoutez ceci
+        setMidTermIndicators([]);
+        setFormValidated(false);
+      }
+    } catch (err) {
+      console.error('Erreur lors du chargement des indicateurs:', err);
+      setError(err.response?.data?.message || err.message || 'Erreur inconnue.');
+    }
+  };
+
+  useEffect(() => {
+    if (evaluationId && currentPeriod === 'Évaluation Finale') {
+      fetchFinalEvaluationData();
+    }
+  }, [evaluationId, currentPeriod, subordinateId, typeUser]);  
+  
+
+  const handleUpdateAndSave = async () => {
+    try {
+      // Préparer les deux payloads
+      const evaluationPayloads = midTermIndicators.map((indicator) => ({
+        userIndicatorId: indicator.userIndicatorId,
+        updatedResults: indicator.results.map((result) => ({
+          ResultId: result.resultId,
+          ResultText: result.resultText,
+          Result: result.result
+        }))
+      }));
+      console.log(evaluationPayloads);
+
+      const helpsPayload = helps.map((help) => ({
         UserId: subordinateId,
         WriterUserId: managerId,
         Type: typeUser,
         HelpId: help.helpId,
-        Content: help.content || '' // Assurez-vous que `content` est bien défini
+        Content: help.content || ''
       }));
-      console.log(payload);
 
-      await formulaireInstance.post('/Evaluation/InsertHelpContentsAndArchive', payload);
-      alert('Les aides ont été sauvegardées avec succès !');
+      // Créer les requêtes
+      const updateEvaluationPromises = evaluationPayloads.map((payload) =>
+        formulaireInstance.post('/Evaluation/UpdateUserIndicatorResults', payload.updatedResults, {
+          params: { userIndicatorId: payload.userIndicatorId }
+        })
+      );
+
+      const saveHelpsPromise = formulaireInstance.post('/Evaluation/InsertHelpContentsAndArchive', helpsPayload);
+
+      // Exécuter toutes les requêtes en parallèle
+      await Promise.all([...updateEvaluationPromises, saveHelpsPromise]);
+
+      alert('Évaluation finale et aides sauvegardées avec succès.');
+      // Rafraîchir les données ou mettre à jour l'état si nécessaire
+      fetchFinalEvaluationData();
+      // Optionnel : Réinitialiser les états si nécessaire
     } catch (err) {
-      console.error('Erreur complète:', err);
+      console.error('Erreur lors de la mise à jour et de la sauvegarde:', err);
       const message = err.response?.data?.message || err.message || 'Erreur inconnue.';
       setError(message);
     }
@@ -355,7 +368,7 @@ const FixationNonCadre = () => {
           </Box>
         ) : error ? (
           <Alert severity="error">{error}</Alert>
-        ) : indicators.length > 0 ? (
+        ) : (
           <>
             {currentPeriod === 'Fixation Objectif' &&
               (isFixationvalidate ? (
@@ -434,9 +447,9 @@ const FixationNonCadre = () => {
                       </Box>
                     </Box>
 
-                    <Box display="flex" justifyContent="center" mt={4}>
+                    <Box display="flex" justifyContent="left" mt={4}>
                       <Button variant="contained" color="primary" onClick={handleValidateObjectives}>
-                        Valider les Objectifs
+                        Valider
                       </Button>
                     </Box>
                   </MainCard>
@@ -445,407 +458,320 @@ const FixationNonCadre = () => {
 
             {currentPeriod === 'Mi-Parcours' && (
               <>
-              {formValidated ? (
-                <Alert severity="info" sx={{ mb: 3 }}>
-                  Vous avez déjà validé le formulaire pour cet période.
-                </Alert>
-              ) : (
-                <>
-                <MainCard
-                  maxWidth="md"
-                  sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    pt: 4,
-                    pb: 4,
-                    mt: 3,
-                    backgroundColor: '#E8EAF6',
-                    p: 2
-                  }}
-                >
-                  <AnimatePresence mode="wait">
-                    {currentCompetence && (
-                      <motion.div
-                        key={currentCompetence.competenceId}
-                        initial={{ opacity: 0, x: 50 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -50 }}
-                        transition={{ duration: 0.4 }}
-                        style={{ width: '100%', textAlign: 'center' }}
-                      >
-                        <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#3949AB', mb: 3 }}>
-                          {currentCompetence.name}
-                        </Typography>
-
-                        <Box
-                          sx={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr',
-                            gap: 3,
-                            mb: 4
-                          }}
-                        >
-                          {formTemplate.levels.map((level) => {
-                            const competenceLevel = currentCompetence.levels?.find((cl) => cl.levelId === level.levelId);
-                            return (
-                              <Box
-                                key={level.levelId}
-                                sx={{
-                                  p: 3,
-                                  borderRadius: 2,
-                                  backgroundColor: '#FFFFFF',
-                                  border: '1px solid #E5E7EB',
-                                  textAlign: 'left',
-                                  transition: 'background-color 0.3s ease',
-                                  '&:hover': { backgroundColor: '#F0F4F8' }
-                                }}
-                              >
-                                <Typography variant="subtitle1" sx={{ fontWeight: '600', color: '#3949AB' }}>
-                                  Niveau : {level.levelName}%
-                                </Typography>
-                                <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                                  {competenceLevel ? competenceLevel.description : 'Description non disponible'}
-                                </Typography>
-                              </Box>
-                            );
-                          })}
-                        </Box>
-
-                        <TextField
-                          label="Performance en %"
-                          variant="outlined"
-                          type="number"
-                          value={currentCompetence?.performance || ''}
-                          onChange={(e) => {
-                            let value = e.target.value;
-                            if (!/^\d{0,3}([.,]\d{0,2})?$/.test(value)) return;
-                            value = value.replace(',', '.');
-                            handleCompetencePerformanceChange(currentCompetence.competenceId, value);
-                          }}
-                          fullWidth
-                          sx={{ mb: 3 }}
-                          InputProps={{
-                            endAdornment: <Typography>%</Typography>
-                          }}
-                        />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, width: '100%', mt: 4 }}>
-                    <IconButton onClick={handleBack} disabled={currentIndex === 0} sx={{ color: 'success.main' }}>
-                      <KeyboardArrowLeft />
-                    </IconButton>
-                    <Typography variant="body2">
-                      {currentIndex + 1} / {formTemplate?.competences?.length || 0}
-                    </Typography>
-                    <IconButton
-                      onClick={handleNext}
-                      disabled={currentIndex === (formTemplate?.competences?.length || 0) - 1}
-                      sx={{ color: 'success.main' }}
+                {!formValidated ? (
+                  <Alert severity="info" sx={{ mb: 3 }}>
+                    Vous avez déjà validé le formulaire pour cet période.
+                  </Alert>
+                ) : (
+                  <>
+                    <MainCard
+                      maxWidth="md"
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        pt: 4,
+                        pb: 4,
+                        mt: 3,
+                        backgroundColor: '#E8EAF6',
+                        p: 2
+                      }}
                     >
-                      <KeyboardArrowRight />
-                    </IconButton>
-                  </Box>
-                </MainCard>
+                      <AnimatePresence mode="wait">
+                        {currentCompetence && (
+                          <motion.div
+                            key={currentCompetence.competenceId}
+                            initial={{ opacity: 0, x: 50 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -50 }}
+                            transition={{ duration: 0.4 }}
+                            style={{ width: '100%', textAlign: 'center' }}
+                          >
+                            <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#3949AB', mb: 3 }}>
+                              {currentCompetence.name}
+                            </Typography>
 
-                <MainCard sx={{ mt: 3, p: 2, backgroundColor: '#E8EAF6' }}>
-                  <Box>
-                    <Typography variant="h5" sx={{ color: '#3949AB', mb: 4, textAlign: 'center' }}>
-                      Indicateurs Métiers
-                    </Typography>
-                    <Box sx={{ display: 'grid', gap: 4 }}>
-                      {indicators.map((indicator, index) => (
-                        <Box key={indicator.userIndicatorId} sx={{ borderRadius: 2, border: '1px solid #E5E7EB', p: 2 }}>
-                          {/* Nom de l'indicateur */}
-                          <TextField
-                            label={indicator.indicatorLabel || "Nom de l'indicateur"}
-                            variant="outlined"
-                            fullWidth
-                            multiline
-                            rows={2}
-                            value={indicator.name || ''}
-                            onChange={(e) => {
-                              const updatedIndicators = [...indicators];
-                              updatedIndicators[index].name = e.target.value;
-                              setIndicators(updatedIndicators);
-                            }}
-                            sx={{ mb: 2 }}
-                          />
+                            <Box
+                              sx={{
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr',
+                                gap: 3,
+                                mb: 4
+                              }}
+                            >
+                              {formTemplate.levels.map((level) => {
+                                const competenceLevel = currentCompetence.levels?.find((cl) => cl.levelId === level.levelId);
+                                return (
+                                  <Box
+                                    key={level.levelId}
+                                    sx={{
+                                      p: 3,
+                                      borderRadius: 2,
+                                      backgroundColor: '#FFFFFF',
+                                      border: '1px solid #E5E7EB',
+                                      textAlign: 'left',
+                                      transition: 'background-color 0.3s ease',
+                                      '&:hover': { backgroundColor: '#F0F4F8' }
+                                    }}
+                                  >
+                                    <Typography variant="subtitle1" sx={{ fontWeight: '600', color: '#3949AB' }}>
+                                      Niveau : {level.levelName}%
+                                    </Typography>
+                                    <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                                      {competenceLevel ? competenceLevel.description : 'Description non disponible'}
+                                    </Typography>
+                                  </Box>
+                                );
+                              })}
+                            </Box>
 
-                          {/* Résultats et pourcentages */}
-                          {indicator.results.map((result, resultIndex) => (
-                            <Grid container spacing={2} key={resultIndex} sx={{ mb: 2 }}>
-                              <Grid item xs={8}>
-                                <TextField
-                                  label={`Résultat Attendu ${resultIndex + 1}`}
-                                  variant="outlined"
-                                  fullWidth
-                                  multiline
-                                  rows={2}
-                                  value={result.resultText || ''}
-                                  onChange={(e) => handleIndicatorResultUpdate(index, resultIndex, 'resultText', e.target.value)}
-                                  disabled={currentPeriod === 'Fixation Objectif'}
-                                />
-                              </Grid>
-                              <Grid item xs={4}>
-                                <TextField
-                                  label="Pourcentage"
-                                  variant="outlined"
-                                  type="number"
-                                  fullWidth
-                                  value={result.result || ''}
-                                  onChange={(e) => {
-                                    let value = e.target.value;
-                                    if (!/^\d{0,3}([.,]\d{0,2})?$/.test(value)) return;
-                                    value = value.replace(',', '.');
-                                    handleIndicatorResultUpdate(index, resultIndex, 'result', value);
-                                  }}
-                                  InputProps={{
-                                    endAdornment: <Typography>%</Typography>
-                                  }}
-                                  disabled={currentPeriod === 'Fixation Objectif'}
-                                />
-                              </Grid>
-                            </Grid>
+                            <TextField
+                              label="Performance en %"
+                              variant="outlined"
+                              type="number"
+                              value={currentCompetence?.performance || ''}
+                              onChange={(e) => {
+                                let value = e.target.value;
+                                if (!/^\d{0,3}([.,]\d{0,2})?$/.test(value)) return;
+                                value = value.replace(',', '.');
+                                handleCompetencePerformanceChange(currentCompetence.competenceId, value);
+                              }}
+                              fullWidth
+                              sx={{ mb: 3 }}
+                              InputProps={{
+                                endAdornment: <Typography>%</Typography>
+                              }}
+                            />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, width: '100%', mt: 4 }}>
+                        <IconButton onClick={handleBack} disabled={currentIndex === 0} sx={{ color: 'success.main' }}>
+                          <KeyboardArrowLeft />
+                        </IconButton>
+                        <Typography variant="body2">
+                          {currentIndex + 1} / {formTemplate?.competences?.length || 0}
+                        </Typography>
+                        <IconButton
+                          onClick={handleNext}
+                          disabled={currentIndex === (formTemplate?.competences?.length || 0) - 1}
+                          sx={{ color: 'success.main' }}
+                        >
+                          <KeyboardArrowRight />
+                        </IconButton>
+                      </Box>
+                    </MainCard>
+
+                    <MainCard sx={{ mt: 3, p: 2, backgroundColor: '#E8EAF6' }}>
+                      <Box>
+                        <Typography variant="h5" sx={{ color: '#3949AB', mb: 4, textAlign: 'center' }}>
+                          Indicateurs Métiers
+                        </Typography>
+                        <Box sx={{ display: 'grid', gap: 4 }}>
+                          {indicators.map((indicator, index) => (
+                            <Box key={indicator.userIndicatorId} sx={{ borderRadius: 2, border: '1px solid #E5E7EB', p: 2 }}>
+                              {/* Nom de l'indicateur */}
+                              <TextField
+                                label={indicator.indicatorLabel || "Nom de l'indicateur"}
+                                variant="outlined"
+                                fullWidth
+                                multiline
+                                rows={2}
+                                value={indicator.name || ''}
+                                onChange={(e) => {
+                                  const updatedIndicators = [...indicators];
+                                  updatedIndicators[index].name = e.target.value;
+                                  setIndicators(updatedIndicators);
+                                }}
+                                sx={{ mb: 2 }}
+                              />
+
+                              {/* Résultats et pourcentages */}
+                              {indicator.results.map((result, resultIndex) => (
+                                <Grid container spacing={2} key={resultIndex} sx={{ mb: 2 }}>
+                                  <Grid item xs={8}>
+                                    <TextField
+                                      label={`Résultat Attendu ${resultIndex + 1}`}
+                                      variant="outlined"
+                                      fullWidth
+                                      multiline
+                                      rows={2}
+                                      value={result.resultText || ''}
+                                      onChange={(e) => handleIndicatorResultUpdate(index, resultIndex, 'resultText', e.target.value)}
+                                      disabled={currentPeriod === 'Fixation Objectif'}
+                                    />
+                                  </Grid>
+                                  <Grid item xs={4}>
+                                    <TextField
+                                      label="Pourcentage"
+                                      variant="outlined"
+                                      type="number"
+                                      fullWidth
+                                      value={result.result || ''}
+                                      onChange={(e) => {
+                                        let value = e.target.value;
+                                        if (!/^\d{0,3}([.,]\d{0,2})?$/.test(value)) return;
+                                        value = value.replace(',', '.');
+                                        handleIndicatorResultUpdate(index, resultIndex, 'result', value);
+                                      }}
+                                      InputProps={{
+                                        endAdornment: <Typography>%</Typography>
+                                      }}
+                                      disabled={currentPeriod === 'Fixation Objectif'}
+                                    />
+                                  </Grid>
+                                </Grid>
+                              ))}
+                            </Box>
                           ))}
                         </Box>
-                      ))}
-                    </Box>
-                  </Box>
+                      </Box>
 
-                  <Box display="flex" justifyContent="center" mt={4}>
-                    <Button variant="contained" color="primary" onClick={handleValidateObjectives}>
-                      Valider les Objectifs
-                    </Button>
-                  </Box>
-                </MainCard>
-                </>
-              )}
+                      <Box display="flex" justifyContent="left" mt={4}>
+                        <Button variant="contained" color="primary" onClick={handleValidateObjectives}>
+                          Valider
+                        </Button>
+                      </Box>
+                    </MainCard>
+                  </>
+                )}
               </>
             )}
 
-            {currentPeriod === 'Évaluation Finale' && helps.length > 0 && (
+            {currentPeriod === 'Évaluation Finale' && (
               <>
-              {formValidated ? (
-                <Alert severity="info" sx={{ mb: 3 }}>
-                  Vous avez déjà validé le formulaire pour cet période.
-                </Alert>
-              ) : (
-                <>
-                <MainCard
-                  maxWidth="md"
-                  sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    pt: 4,
-                    pb: 4,
-                    mt: 3,
-                    backgroundColor: '#E8EAF6',
-                    p: 2
-                  }}
-                >
-                  <AnimatePresence mode="wait">
-                    {currentCompetence && (
-                      <motion.div
-                        key={currentCompetence.competenceId}
-                        initial={{ opacity: 0, x: 50 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -50 }}
-                        transition={{ duration: 0.4 }}
-                        style={{ width: '100%', textAlign: 'center' }}
-                      >
-                        <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#3949AB', mb: 3 }}>
-                          {currentCompetence.name}
-                        </Typography>
-
-                        <Box
-                          sx={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr',
-                            gap: 3,
-                            mb: 4
-                          }}
-                        >
-                          {formTemplate.levels.map((level) => {
-                            const competenceLevel = currentCompetence.levels?.find((cl) => cl.levelId === level.levelId);
-                            return (
-                              <Box
-                                key={level.levelId}
-                                sx={{
-                                  p: 3,
-                                  borderRadius: 2,
-                                  backgroundColor: '#FFFFFF',
-                                  border: '1px solid #E5E7EB',
-                                  textAlign: 'left',
-                                  transition: 'background-color 0.3s ease',
-                                  '&:hover': { backgroundColor: '#F0F4F8' }
-                                }}
-                              >
-                                <Typography variant="subtitle1" sx={{ fontWeight: '600', color: '#3949AB' }}>
-                                  Niveau : {level.levelName}%
-                                </Typography>
-                                <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                                  {competenceLevel ? competenceLevel.description : 'Description non disponible'}
-                                </Typography>
-                              </Box>
-                            );
-                          })}
-                        </Box>
-
-                        <TextField
-                          label="Performance en %"
-                          variant="outlined"
-                          type="number"
-                          value={currentCompetence?.performance || ''}
-                          onChange={(e) => {
-                            let value = e.target.value;
-                            if (!/^\d{0,3}([.,]\d{0,2})?$/.test(value)) return;
-                            value = value.replace(',', '.');
-                            handleCompetencePerformanceChange(currentCompetence.competenceId, value);
-                          }}
-                          fullWidth
-                          sx={{ mb: 3 }}
-                          InputProps={{
-                            endAdornment: <Typography>%</Typography>
-                          }}
-                        />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, width: '100%', mt: 4 }}>
-                    <IconButton onClick={handleBack} disabled={currentIndex === 0} sx={{ color: 'success.main' }}>
-                      <KeyboardArrowLeft />
-                    </IconButton>
-                    <Typography variant="body2">
-                      {currentIndex + 1} / {formTemplate?.competences?.length || 0}
-                    </Typography>
-                    <IconButton
-                      onClick={handleNext}
-                      disabled={currentIndex === (formTemplate?.competences?.length || 0) - 1}
-                      sx={{ color: 'success.main' }}
-                    >
-                      <KeyboardArrowRight />
-                    </IconButton>
-                  </Box>
-                </MainCard>
-
-                <MainCard sx={{ mt: 3, p: 2, backgroundColor: '#E8EAF6' }}>
-                  <Box>
-                    <Typography variant="h5" sx={{ color: '#3949AB', mb: 4, textAlign: 'center' }}>
-                      Indicateurs Métiers
-                    </Typography>
-                    <Box sx={{ display: 'grid', gap: 4 }}>
-                      {indicators.map((indicator, index) => (
-                        <Box key={indicator.userIndicatorId} sx={{ borderRadius: 2, border: '1px solid #E5E7EB', p: 2 }}>
-                          {/* Nom de l'indicateur */}
-                          <TextField
-                            label={indicator.indicatorLabel || "Nom de l'indicateur"}
-                            variant="outlined"
-                            fullWidth
-                            multiline
-                            rows={2}
-                            value={indicator.name || ''}
-                            onChange={(e) => {
-                              const updatedIndicators = [...indicators];
-                              updatedIndicators[index].name = e.target.value;
-                              setIndicators(updatedIndicators);
-                            }}
-                            sx={{ mb: 2 }}
-                          />
-
-                          {/* Résultats et pourcentages */}
-                          {indicator.results.map((result, resultIndex) => (
-                            <Grid container spacing={2} key={resultIndex} sx={{ mb: 2 }}>
-                              <Grid item xs={8}>
-                                <TextField
-                                  label={`Résultat Attendu ${resultIndex + 1}`}
-                                  variant="outlined"
-                                  fullWidth
-                                  multiline
-                                  rows={2}
-                                  value={result.resultText || ''}
-                                  onChange={(e) => handleIndicatorResultUpdate(index, resultIndex, 'resultText', e.target.value)}
-                                  disabled={currentPeriod === 'Fixation Objectif'}
-                                />
-                              </Grid>
-                              <Grid item xs={4}>
-                                <TextField
-                                  label="Pourcentage"
-                                  variant="outlined"
-                                  type="number"
-                                  fullWidth
-                                  value={result.result || ''}
-                                  onChange={(e) => {
-                                    let value = e.target.value;
-                                    if (!/^\d{0,3}([.,]\d{0,2})?$/.test(value)) return;
-                                    value = value.replace(',', '.');
-                                    handleIndicatorResultUpdate(index, resultIndex, 'result', value);
-                                  }}
-                                  InputProps={{
-                                    endAdornment: <Typography>%</Typography>
-                                  }}
-                                  disabled={currentPeriod === 'Fixation Objectif'}
-                                />
-                              </Grid>
-                            </Grid>
-                          ))}
-                        </Box>
-                      ))}
-                    </Box>
-                  </Box>
-
-                  <Box display="flex" justifyContent="center" mt={4}>
-                    <Button variant="contained" color="primary" onClick={handleValidateObjectives}>
-                      Valider les Objectifs
-                    </Button>
-                  </Box>
-                </MainCard>
-                </>
-              )}
-
-              <MainCard sx={{ mt: 3, p: 2, backgroundColor: '#E8F5E9' }}>
-                <Typography variant="h5" sx={{ color: '#2E7D32', mb: 2 }}>
-                  Aides Disponibles
-                </Typography>
-                <Box sx={{ display: 'grid', gap: 2 }}>
-                  {helps.map((help, index) => (
-                    <Box key={help.HelpId} sx={{ border: '1px solid #C8E6C9', borderRadius: 2, p: 2 }}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#2E7D32', mb: 1 }}>
-                        {help.name}
+                {!formValidated ? (
+                  <Alert severity="info" sx={{ mb: 3 }}>
+                    Vous avez déjà validé le formulaire pour cette période.
+                  </Alert>
+                ) : (
+                  <>
+                    {/* Indicateurs Métiers */}
+                    <MainCard sx={{ mt: 3, p: 2, backgroundColor: '#E8EAF6' }}>
+                      <Typography variant="h5" sx={{ color: '#3949AB', mb: 4, textAlign: 'center' }}>
+                        Indicateurs Métiers
                       </Typography>
-                      <TextField
-                        fullWidth
-                        variant="outlined"
-                        value={help.content || ''} // Initialisation si `content` est null/undefined
-                        onChange={(e) => {
-                          const updatedHelps = [...helps];
-                          updatedHelps[index].content = e.target.value;
-                          setHelps(updatedHelps); // Met à jour l'état des helps
-                        }}
-                      />
+                      <Box sx={{ display: 'grid', gap: 4 }}>
+                        {midTermIndicators.map((indicator) => (
+                          <Box key={indicator.userIndicatorId} sx={{ borderRadius: 2, border: '1px solid #E5E7EB', p: 2 }}>
+                            {/* Nom de l'indicateur */}
+                            <TextField
+                              label="Nom de l'indicateur"
+                              variant="outlined"
+                              fullWidth
+                              value={indicator.name || 'Nom manquant'}
+                              InputProps={{
+                                readOnly: true
+                              }}
+                              sx={{ mb: 2 }}
+                            />
+
+                            {/* Résultats et pourcentages */}
+                            {indicator.results.map((result, resultIndex) => (
+                              <Grid container spacing={2} key={result.resultId || resultIndex} sx={{ mb: 2 }}>
+                                <Grid item xs={8}>
+                                  <TextField
+                                    label={`Résultat Attendu ${resultIndex + 1}`}
+                                    variant="outlined"
+                                    fullWidth
+                                    multiline
+                                    rows={2}
+                                    value={result.resultText || ''}
+                                    InputProps={{
+                                      readOnly: true
+                                    }}
+                                  />
+                                </Grid>
+                                <Grid item xs={4}>
+                                  <TextField
+                                    label="Pourcentage"
+                                    variant="outlined"
+                                    type="number"
+                                    fullWidth
+                                    value={result.result || ''}
+                                    onChange={(e) => {
+                                      const value = parseFloat(e.target.value) || 0;
+                                      const updatedIndicators = [...midTermIndicators];
+                                      const indicatorIndex = updatedIndicators.findIndex(
+                                        (ind) => ind.userIndicatorId === indicator.userIndicatorId
+                                      );
+                                      if (indicatorIndex !== -1) {
+                                        const resultIndex = updatedIndicators[indicatorIndex].results.findIndex(
+                                          (res) => res.resultId === result.resultId
+                                        );
+                                        if (resultIndex !== -1) {
+                                          updatedIndicators[indicatorIndex].results[resultIndex].result = value;
+                                          setMidTermIndicators(updatedIndicators);
+                                        }
+                                      }
+                                    }}
+                                    InputProps={{
+                                      endAdornment: <Typography>%</Typography>
+                                    }}
+                                  />
+                                </Grid>
+                              </Grid>
+                            ))}
+                          </Box>
+                        ))}
+                      </Box>
+                    </MainCard>
+
+                    {/* Aides Disponibles */}
+                    <MainCard sx={{ mt: 3, p: 2, backgroundColor: '#E8F5E9' }}>
+                      <Typography variant="h5" sx={{ color: '#2E7D32', mb: 2 }}>
+                        Aides Disponibles
+                      </Typography>
+                      <Box sx={{ display: 'grid', gap: 2 }}>
+                        {helps.map((help) => (
+                          <Box key={help.HelpId} sx={{ border: '1px solid #C8E6C9', borderRadius: 2, p: 2 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#2E7D32', mb: 1 }}>
+                              {help.name}
+                            </Typography>
+                            <TextField
+                              fullWidth
+                              variant="outlined"
+                              multiline
+                              rows={3}
+                              value={help.content || ''}
+                              onChange={(e) => {
+                                const updatedHelps = [...helps];
+                                const helpToUpdate = updatedHelps.find((h) => h.HelpId === help.HelpId);
+                                if (helpToUpdate) {
+                                  helpToUpdate.content = e.target.value;
+                                  setHelps(updatedHelps);
+                                }
+                              }}
+                            />
+                          </Box>
+                        ))}
+                      </Box>
+                    </MainCard>
+
+                    {/* Bouton Unique pour Mettre à Jour l'Évaluation et Sauvegarder les Aides */}
+                    <Box display="flex" justifyContent="left" mt={3}>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleUpdateAndSave}
+                        disabled={
+                          // Désactiver si un champ de pourcentage est vide ou invalide
+                          midTermIndicators.some((indicator) =>
+                            indicator.results.some((result) => result.result === undefined || result.result === null)
+                          ) ||
+                          // Désactiver si un champ d'aide est vide
+                          helps.some((help) => !help.content || help.content.trim() === '')
+                        }
+                      >
+                        Valider
+                      </Button>
                     </Box>
-                  ))}
-                </Box>
-                <Box display="flex" justifyContent="center" mt={3}>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={handleSaveHelps}
-                    disabled={helps.some((help) => !help.content || help.content.trim() === '')} // Désactiver si un champ est vide
-                  >
-                    Valider
-                  </Button>
-                </Box>
-              </MainCard>
+                  </>
+                )}
               </>
             )}
           </>
-        ) : (
-          <Alert severity="info">Aucun indicateur utilisateur trouvé.</Alert>
         )}
       </MainCard>
     </Paper>

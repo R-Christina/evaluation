@@ -25,6 +25,7 @@ const evaluation = {
           title: 'Cadre',
           type: 'item',
           url: '/formulaireCadre/home',
+          requiredHabilitation: 9,
           target: false,
           breadcrumbs: false
         },
@@ -33,6 +34,7 @@ const evaluation = {
           title: 'Non Cadre',
           type: 'item',
           url: '/formulaireNonCadre/home',
+          requiredHabilitation: 9,
           target: false,
           breadcrumbs: false
         }
@@ -44,6 +46,7 @@ const evaluation = {
       title: 'Période',
       type: 'item',
       url: '/evaluation/listeEvaluation',
+      requiredHabilitation: 11,
       icon: icons.IconCalendarEvent,
       breadcrumbs: false
     },
@@ -53,6 +56,7 @@ const evaluation = {
       title: 'Cadre',
       type: 'item',
       url: '/evaluation/remplissage',
+      requiredHabilitation: 15,
       icon: icons.IconTargetArrow,
       breadcrumbs: false
     },
@@ -62,6 +66,7 @@ const evaluation = {
       title: 'Non Cadre',
       type: 'item',
       url: '/evaluation/RemplissageNonCadre',
+      requiredHabilitation: 19,
       icon: icons.IconTargetArrow,
       breadcrumbs: false
     },

@@ -43,8 +43,9 @@ namespace EvaluationService.Data
         public DbSet<HistoryUserIndicatorMP> HistoryUserIndicatorMPs { get; set; }
         public DbSet<UserEvaluationWeight> UserEvaluationWeights { get; set; }
         public DbSet<HistoryUserHelpContent> HistoryUserHelpContents { get; set; }
+        public DbSet<HistoryUserindicatorFi> HistoryUserindicatorFis { get; set; }
 
-
+        public DbSet<Notification> Notifications { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

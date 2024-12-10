@@ -5,18 +5,27 @@ using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-builder.Services.AddControllers();
+// Ajouter SignalR
+builder.Services.AddSignalR();
 
-// Connection to SQL Server
+// Configuration de la connexion à SQL Server
 builder.Services.AddDbContext<AppdbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
            .EnableSensitiveDataLogging()
            .LogTo(Console.WriteLine, LogLevel.Information));
 
-// Add HttpClient for UserService with base URL
+// Ajouter Swagger pour la documentation
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// Ajouter les contrôleurs
+builder.Services.AddControllers().AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+    options.JsonSerializerOptions.WriteIndented = true;
+});
+
+// Ajouter HttpClient pour UserService avec l'URL de base
 builder.Services.AddHttpClient("UserService", client =>
 {
     var baseUrl = builder.Configuration["UserService:BaseUrl"];
@@ -24,34 +33,38 @@ builder.Services.AddHttpClient("UserService", client =>
     client.DefaultRequestHeaders.Add("Accept", "application/json");
 });
 
-// Register AuthorizationService with DI
+// Ajouter un service personnalisé à l'injection de dépendances
 builder.Services.AddScoped<AuthorizationService>();
 
-// Add CORS policy
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll",
-        policy =>
-        {
-            policy.AllowAnyOrigin()
-                  .AllowAnyMethod()
-                  .AllowAnyHeader();
-        });
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.WithOrigins("http://localhost:3000") // Frontend URL
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials()
+              .SetIsOriginAllowed(_ => true); // For SignalR or if cookies are involved
+    });
 });
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-app.UseCors("AllowAll");
+// Apply middleware in the correct order
 app.UseHttpsRedirection();
 app.UseRouting();
+app.UseCors("AllowAll"); // Ensure this comes after UseRouting
 app.UseAuthorization();
+
+// Map endpoints
+app.MapHub<NotificationHub>("/notificationHub").RequireCors("AllowAll");
 app.MapControllers();
 
 app.Run();
+

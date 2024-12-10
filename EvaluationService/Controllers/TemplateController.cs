@@ -322,84 +322,168 @@ namespace EvaluationService.Controllers
         }
 
 
+        // [HttpGet("NonCadreTemplate/{templateId:int}")]
+        // public async Task<IActionResult> GetNonCadreTemplate(int templateId)
+        // {
+        //     try
+        //     {
+        //         // Récupération du modèle principal
+        //         var template = await _context.FormTemplates
+        //             .Where(t => t.TemplateId == templateId && t.Type == FormType.NonCadre)
+        //             .Include(t => t.Competences)
+        //                 .ThenInclude(c => c.CompetenceLevels)
+        //             .FirstOrDefaultAsync();
+
+        //         if (template == null)
+        //         {
+        //             return NotFound("Le modèle de type NonCadre avec cet ID n'existe pas.");
+        //         }
+
+        //         // Récupération des pondérations d'évaluation de l'utilisateur
+        //         var userEvaluationWeights = await _context.UserEvaluationWeights
+        //             .FirstOrDefaultAsync(w => w.TemplateId == templateId);
+
+        //         // Récupération des "Helps" actifs uniquement
+        //         var helps = await _context.Helps
+        //             .Where(h => h.TemplateId == templateId && h.IsActive)
+        //             .Select(h => new
+        //             {
+        //                 h.HelpId,
+        //                 h.Name
+        //             })
+        //             .ToListAsync();
+
+        //         // Récupération des niveaux
+        //         var levels = await _context.Levels.Select(l => new
+        //         {
+        //             l.LevelId,
+        //             l.LevelName
+        //         }).ToListAsync();
+
+        //         // Récupération des indicateurs actifs uniquement
+        //         var indicators = await _context.Indicators
+        //             .Where(i => i.TemplateId == templateId && i.IsActive)
+        //             .Select(i => new
+        //             {
+        //                 i.IndicatorId,
+        //                 i.MaxResults,
+        //                 i.label
+        //             }).ToListAsync();
+
+        //         // Construction du résultat
+        //         var result = new
+        //         {
+        //             TemplateId = template.TemplateId,
+        //             Name = template.Name,
+        //             CreationDate = template.CreationDate,
+        //             CompetenceWeightTotal = userEvaluationWeights?.CompetenceWeightTotal,
+        //             IndicatorWeightTotal = userEvaluationWeights?.IndicatorWeightTotal,
+        //             Competences = template.Competences.Select(c => new
+        //             {
+        //                 c.CompetenceId,
+        //                 c.Name,
+        //                 Levels = c.CompetenceLevels.Select(cl => new
+        //                 {
+        //                     cl.LevelId,
+        //                     cl.Level.LevelName,
+        //                     cl.Description
+        //                 })
+        //             }),
+        //             Helps = helps,
+        //             Levels = levels,
+        //             Indicators = indicators
+        //         };
+
+        //         return Ok(result);
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         return StatusCode(500, "Erreur du serveur : " + ex.Message);
+        //     }
+        // }
+
         [HttpGet("NonCadreTemplate/{templateId:int}")]
-        public async Task<IActionResult> GetNonCadreTemplate(int templateId)
+public async Task<IActionResult> GetNonCadreTemplate(int templateId)
+{
+    try
+    {
+        // Récupération du modèle principal avec Level inclus
+        var template = await _context.FormTemplates
+            .Where(t => t.TemplateId == templateId && t.Type == FormType.NonCadre)
+            .Include(t => t.Competences)
+                .ThenInclude(c => c.CompetenceLevels)
+                    .ThenInclude(cl => cl.Level) // Eagerly load Level
+            .FirstOrDefaultAsync();
+
+        if (template == null)
         {
-            try
-            {
-                // Récupération du modèle principal
-                var template = await _context.FormTemplates
-                    .Where(t => t.TemplateId == templateId && t.Type == FormType.NonCadre)
-                    .Include(t => t.Competences)
-                        .ThenInclude(c => c.CompetenceLevels)
-                    .FirstOrDefaultAsync();
-
-                if (template == null)
-                {
-                    return NotFound("Le modèle de type NonCadre avec cet ID n'existe pas.");
-                }
-
-                // Récupération des pondérations d'évaluation de l'utilisateur
-                var userEvaluationWeights = await _context.UserEvaluationWeights
-                    .FirstOrDefaultAsync(w => w.TemplateId == templateId);
-
-                // Récupération des "Helps" actifs uniquement
-                var helps = await _context.Helps
-                    .Where(h => h.TemplateId == templateId && h.IsActive)
-                    .Select(h => new
-                    {
-                        h.HelpId,
-                        h.Name
-                    })
-                    .ToListAsync();
-
-                // Récupération des niveaux
-                var levels = await _context.Levels.Select(l => new
-                {
-                    l.LevelId,
-                    l.LevelName
-                }).ToListAsync();
-
-                // Récupération des indicateurs actifs uniquement
-                var indicators = await _context.Indicators
-                    .Where(i => i.TemplateId == templateId && i.IsActive)
-                    .Select(i => new
-                    {
-                        i.IndicatorId,
-                        i.MaxResults,
-                        i.label
-                    }).ToListAsync();
-
-                // Construction du résultat
-                var result = new
-                {
-                    TemplateId = template.TemplateId,
-                    Name = template.Name,
-                    CreationDate = template.CreationDate,
-                    CompetenceWeightTotal = userEvaluationWeights?.CompetenceWeightTotal,
-                    IndicatorWeightTotal = userEvaluationWeights?.IndicatorWeightTotal,
-                    Competences = template.Competences.Select(c => new
-                    {
-                        c.CompetenceId,
-                        c.Name,
-                        Levels = c.CompetenceLevels.Select(cl => new
-                        {
-                            cl.LevelId,
-                            cl.Description
-                        })
-                    }),
-                    Helps = helps,
-                    Levels = levels,
-                    Indicators = indicators
-                };
-
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, "Erreur du serveur : " + ex.Message);
-            }
+            return NotFound("Le modèle de type NonCadre avec cet ID n'existe pas.");
         }
+
+        // Récupération des pondérations d'évaluation de l'utilisateur
+        var userEvaluationWeights = await _context.UserEvaluationWeights
+            .FirstOrDefaultAsync(w => w.TemplateId == templateId);
+
+        // Récupération des "Helps" actifs uniquement
+        var helps = await _context.Helps
+            .Where(h => h.TemplateId == templateId && h.IsActive)
+            .Select(h => new
+            {
+                h.HelpId,
+                h.Name
+            })
+            .ToListAsync();
+
+        // Récupération des niveaux
+        var levels = await _context.Levels.Select(l => new
+        {
+            l.LevelId,
+            l.LevelName
+        }).ToListAsync();
+
+        // Récupération des indicateurs actifs uniquement
+        var indicators = await _context.Indicators
+            .Where(i => i.TemplateId == templateId && i.IsActive)
+            .Select(i => new
+            {
+                i.IndicatorId,
+                i.MaxResults,
+                i.label
+            }).ToListAsync();
+
+        // Construction du résultat avec null handling
+        var result = new
+        {
+            TemplateId = template.TemplateId,
+            Name = template.Name,
+            CreationDate = template.CreationDate,
+            CompetenceWeightTotal = userEvaluationWeights?.CompetenceWeightTotal,
+            IndicatorWeightTotal = userEvaluationWeights?.IndicatorWeightTotal,
+            Competences = template.Competences.Select(c => new
+            {
+                c.CompetenceId,
+                c.Name,
+                Levels = c.CompetenceLevels.Select(cl => new
+                {
+                    cl.LevelId,
+                    LevelName = cl.Level?.LevelName ?? "N/A", // Handle null Level
+                    cl.Description
+                })
+            }),
+            Helps = helps,
+            Levels = levels,
+            Indicators = indicators
+        };
+
+        return Ok(result);
+    }
+    catch (Exception ex)
+    {
+        // Consider logging the exception details here for debugging purposes
+        return StatusCode(500, "Erreur du serveur : " + ex.Message);
+    }
+}
+
 
 
         [HttpGet("NonCadreTemplate")]

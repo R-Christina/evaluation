@@ -10,5 +10,4 @@ namespace EvaluationService.DTOs
         public decimal Result { get; set; }
         public List<ColumnValueDto> DynamicColumns { get; set; }  // Colonne dynamique pour chaque objectif
     }
-
 }

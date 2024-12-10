@@ -52,26 +52,7 @@ const Remplissage = () => {
 
   // États pour Final
   const [helps, setHelps] = useState([]);
-
-  const handleSaveHelps = async () => {
-    try {
-      const payload = helps.map((help) => ({
-        UserId: userId,
-        WriterUserId: userId,
-        Type: userType,
-        HelpId: help.helpId,
-        Content: help.content || ''
-      }));
-      console.log(payload);
-
-      await formulaireInstance.post('/Evaluation/InsertHelpContentsAndArchive', payload);
-      alert('Les aides ont été sauvegardées avec succès !');
-    } catch (err) {
-      console.error('Erreur complète:', err);
-      const message = err.response?.data?.message || err.message || 'Erreur inconnue.';
-      setError(message);
-    }
-  };
+  const [loadingEvaluationFinale, setLoadingEvaluationFinale] = useState(false);
 
   // Récupérer le template initial et les informations d'évaluation en cours
   useEffect(() => {
@@ -114,7 +95,7 @@ const Remplissage = () => {
   // Vérifier si l'utilisateur a déjà validé lors de la période 'Fixation Objectif'
   useEffect(() => {
     const checkValidation = async () => {
-      if (currentPeriod === 'Fixation Objectif' && evalId && userId) {
+      if (currentPeriod === 'Fixation Objectif'&& evalId && userId) {
         try {
           const response = await formulaireInstance.get('/Evaluation/IndicatorValidateByUser', {
             params: {
@@ -152,20 +133,20 @@ const Remplissage = () => {
         setLoading(true);
         setErrorMessage(null);
         setSuccessMessage(null);
-  
+
         try {
           const [competencesResponse, indicatorsResponse] = await Promise.all([
             formulaireInstance.get(`/Evaluation/${evalId}/competences/${userId}`),
-            formulaireInstance.get(`/Evaluation/${evalId}/indicators/${userId}`),
+            formulaireInstance.get(`/Evaluation/${evalId}/indicators/${userId}`)
           ]);
-  
+
           // Si les requêtes aboutissent, mettez à jour les états
           const competences = Array.isArray(competencesResponse.data) ? competencesResponse.data : [];
           const indicators = Array.isArray(indicatorsResponse.data) ? indicatorsResponse.data : [];
-  
+
           setCompetences(competences);
           setIndicators(indicators);
-  
+
           // Vérifiez si les deux contiennent des données
           if (competences.length > 0 && indicators.length > 0) {
             setIsResultDispo(true);
@@ -177,8 +158,7 @@ const Remplissage = () => {
             setIsResultDispo(false);
           } else {
             // Pour toutes les autres erreurs, affiche le message générique ou celui du backend
-            const backendErrorMessage =
-              error.response?.data?.Message || 'Erreur lors de la récupération des données Mi-Parcours.';
+            const backendErrorMessage = error.response?.data?.Message || 'Erreur lors de la récupération des données Mi-Parcours.';
             setErrorMessage(backendErrorMessage);
           }
         } finally {
@@ -186,9 +166,9 @@ const Remplissage = () => {
         }
       }
     };
-  
+
     fetchMiParcoursData();
-  }, [currentPeriod, evalId, userId]);  
+  }, [currentPeriod, evalId, userId]);
 
   const handleIndicatorLabelChange = (indicatorId, value) => {
     setIndicatorValues((prev) => ({
@@ -294,6 +274,40 @@ const Remplissage = () => {
     }
   };
 
+  const fetchEvaluationFinaleData = async () => {
+    setLoadingEvaluationFinale(true); // Indicateur de chargement pour l'Évaluation Finale
+    setErrorMessage(null);
+    setSuccessMessage(null);
+  
+    try {
+      const indicatorsResponse = await formulaireInstance.get(`/Evaluation/${evalId}/indicators/${userId}`);
+  
+      const indicators = Array.isArray(indicatorsResponse.data) ? indicatorsResponse.data : [];
+  
+      setIndicators(indicators);
+  
+      if (indicators.length > 0) {
+        setIsResultDispo(true);
+      } else {
+        setIsResultDispo(false);
+      }
+    } catch (error) {
+      if (error.response?.status === 404) {
+        setIsResultDispo(false);
+      } else {
+        setErrorMessage(error.response?.data?.Message || 'Erreur lors de la récupération des indicateurs pour l\'évaluation finale.');
+      }
+    } finally {
+      setLoadingEvaluationFinale(false); // Fin du chargement
+    }
+  };
+  
+  useEffect(() => {
+    if (currentPeriod === 'Évaluation Finale') {
+      fetchEvaluationFinaleData();
+    }
+  }, [currentPeriod, evalId, userId]);  
+
   const fetchHelps = async () => {
     try {
       const response = await formulaireInstance.get('/Archive/HelpsByAllowedUserLevel/1');
@@ -302,6 +316,62 @@ const Remplissage = () => {
       setErrorMessage(null);
     } catch (error) {
       const backendErrorMessage = error.response?.data?.Message || 'Erreur lors de la récupération des aides.';
+      setErrorMessage(backendErrorMessage);
+    }
+  };
+
+  const handleSaveAndSubmit = async () => {
+    // Première opération : Sauvegarder les aides
+    try {
+      const payloadHelps = helps.map((help) => ({
+        UserId: userId,
+        WriterUserId: userId,
+        Type: userType,
+        HelpId: help.helpId,
+        Content: help.content || ''
+      }));
+      console.log('Payload des aides:', payloadHelps);
+  
+      await formulaireInstance.post('/Evaluation/InsertHelpContentsAndArchive', payloadHelps);
+      alert('Les aides ont été sauvegardées avec succès !');
+    } catch (err) {
+      console.error('Erreur lors de la sauvegarde des aides:', err);
+      const message = err.response?.data?.message || err.message || 'Erreur inconnue lors de la sauvegarde des aides.';
+      setError(message);
+    }
+  
+    // Deuxième opération : Soumettre l'évaluation finale
+    try {
+      if (!indicators || indicators.length === 0) {
+        setErrorMessage("Aucun indicateur à soumettre.");
+        return;
+      }
+  
+      // Préparer les données à envoyer
+      const indicatorsToSubmit = indicators.map((indicator) => ({
+        indicatorId: indicator.indicatorId,
+        indicatorName: indicator.indicatorName,
+        results: indicator.results.map((result) => ({
+          resultText: result.resultText || 'N/A', // Utilisation directe de resultText
+          result: result.result || 0 
+        }))
+      }));
+      console.log(indicatorsToSubmit);
+  
+      const response = await formulaireInstance.post('/Evaluation/ValidateIndicatorFiHistory', indicatorsToSubmit, {
+        params: {
+          userId: userId,
+          validateUserId: userId, // Si le validateur est différent, ajustez cette valeur
+          type: 'NonCadre' // Assurez-vous que 'Noncadre' correspond à la valeur attendue par votre backend
+        }
+      });
+  
+      setSuccessMessage(response.data.Message || "Indicateurs soumis avec succès pour l'Évaluation Finale.");
+      setErrorMessage(null);
+      setIsValidated(true);
+    } catch (error) {
+      console.error('Erreur lors de la soumission de l\'évaluation finale:', error);
+      const backendErrorMessage = error.response?.data?.message || 'Une erreur inconnue est survenue lors de la soumission.';
       setErrorMessage(backendErrorMessage);
     }
   };
@@ -655,42 +725,166 @@ const Remplissage = () => {
         )}
 
         {currentPeriod === 'Évaluation Finale' && (
-          <MainCard sx={{ mt: 3, p: 2, backgroundColor: '#E8F5E9' }}>
-            <Typography variant="h5" sx={{ color: '#2E7D32', mb: 2 }}>
-              Aides Disponibles
-            </Typography>
-            <Box sx={{ display: 'grid', gap: 2 }}>
-              {helps.map((help, index) => (
-                <Box key={help.helpId} sx={{ border: '1px solid #C8E6C9', borderRadius: 2, p: 2 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#2E7D32', mb: 1 }}>
-                    {help.name}
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    variant="outlined"
-                    multiline
-                    minRows={4}
-                    value={help.content || ''} // Initialisation si `content` est null/undefined
-                    onChange={(e) => {
-                      const updatedHelps = [...helps];
-                      updatedHelps[index].content = e.target.value;
-                      setHelps(updatedHelps); // Met à jour l'état des helps
-                    }}
-                  />
-                </Box>
-              ))}
-            </Box>
-            <Box display="flex" justifyContent="center" mt={3}>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleSaveHelps}
-                disabled={helps.some((help) => !help.content || help.content.trim() === '')} // Désactiver si un champ est vide
+          <>
+            <Card
+              sx={{
+                border: '1px solid #E0E0E0',
+                borderRadius: '8px',
+                boxShadow: 'none',
+                mt: '20px',
+                p: 2
+              }}
+            >
+              <Typography
+                variant="h4"
+                sx={{
+                  fontWeight: 600,
+                  mb: 2,
+                  fontFamily: 'Roboto, sans-serif',
+                  color: '#333333'
+                }}
               >
-                Valider
-              </Button>
-            </Box>
-          </MainCard>
+                Indicateurs
+              </Typography>
+              <Divider sx={{ mb: 2, backgroundColor: '#E0E0E0' }} />
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell
+                        sx={{
+                          fontWeight: 'bold',
+                          color: '#333333',
+                          textAlign: 'left'
+                        }}
+                      >
+                        Nom de l'indicateur
+                      </TableCell>
+                      <TableCell
+                        sx={{
+                          fontWeight: 'bold',
+                          color: '#333333',
+                          textAlign: 'left'
+                        }}
+                      >
+                        Résultat (Texte)
+                      </TableCell>
+                      <TableCell
+                        sx={{
+                          fontWeight: 'bold',
+                          color: '#333333',
+                          textAlign: 'right'
+                        }}
+                      >
+                        Résultat (Valeur)
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {indicators.map((indicator, index) =>
+                      indicator.results && indicator.results.length > 0 ? (
+                        indicator.results
+                          .filter((result) => result.resultText !== 'N/A')
+                          .map((result, resultIndex, filteredResults) => (
+                            <TableRow key={`${indicator.indicatorId}-${resultIndex}`}>
+                              {resultIndex === 0 && (
+                                <TableCell
+                                  rowSpan={filteredResults.length}
+                                  sx={{
+                                    color: '#555555',
+                                    fontWeight: 600,
+                                    verticalAlign: 'top',
+                                    textAlign: 'left'
+                                  }}
+                                >
+                                  {indicator.indicatorName}
+                                </TableCell>
+                              )}
+                              <TableCell
+                                sx={{
+                                  color: '#555555',
+                                  textAlign: 'left'
+                                }}
+                              >
+                                {result.resultText}
+                              </TableCell>
+                              <TableCell
+                                sx={{
+                                  color: '#555555',
+                                  textAlign: 'right'
+                                }}
+                              >
+                                {result.result} %
+                              </TableCell>
+                            </TableRow>
+                          ))
+                      ) : (
+                        <TableRow key={indicator.indicatorId}>
+                          <TableCell sx={{ color: '#555555', textAlign: 'left' }}>{index + 1}</TableCell>
+                          <TableCell
+                            sx={{
+                              color: '#555555',
+                              fontWeight: 600,
+                              textAlign: 'left'
+                            }}
+                          >
+                            {indicator.indicatorName}
+                          </TableCell>
+                          <TableCell
+                            colSpan={2}
+                            sx={{
+                              color: '#757575',
+                              fontStyle: 'italic',
+                              textAlign: 'center'
+                            }}
+                          >
+                            Aucun résultat disponible.
+                          </TableCell>
+                        </TableRow>
+                      )
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Card>
+
+            <MainCard sx={{ mt: 3, p: 2, backgroundColor: '#E8F5E9' }}>
+              <Typography variant="h5" sx={{ color: '#2E7D32', mb: 2 }}>
+                Aides Disponibles
+              </Typography>
+              <Box sx={{ display: 'grid', gap: 2 }}>
+                {helps.map((help, index) => (
+                  <Box key={help.helpId} sx={{ border: '1px solid #C8E6C9', borderRadius: 2, p: 2 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#2E7D32', mb: 1 }}>
+                      {help.name}
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      variant="outlined"
+                      multiline
+                      minRows={4}
+                      value={help.content || ''} // Initialisation si `content` est null/undefined
+                      onChange={(e) => {
+                        const updatedHelps = [...helps];
+                        updatedHelps[index].content = e.target.value;
+                        setHelps(updatedHelps); // Met à jour l'état des helps
+                      }}
+                    />
+                  </Box>
+                ))}
+              </Box>
+              <Box display="flex" justifyContent="center" mt={3}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={handleSaveAndSubmit}
+                  disabled={helps.some((help) => !help.content || help.content.trim() === '')} // Désactiver si un champ est vide
+                >
+                  Valider
+                </Button>
+              </Box>
+            </MainCard>
+          </>
         )}
       </MainCard>
     </Paper>

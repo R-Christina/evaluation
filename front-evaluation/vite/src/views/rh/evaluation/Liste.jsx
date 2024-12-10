@@ -37,8 +37,8 @@ const Liste = ({ isDataUpdated }) => {
   const [canAdd, setCanAdd] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
   const navigate = useNavigate();
-  const HABILITATION_ADD = 1;
-  const HABILITATION_EDIT = 2;
+  const HABILITATION_ADD = 12;
+  const HABILITATION_EDIT = 13;
 
   const checkPermissions = async () => {
     try {
@@ -207,18 +207,23 @@ const Liste = ({ isDataUpdated }) => {
         </Alert>
       )}
 
-      <TableContainer>
-        <Table>
+      <TableContainer component="div" sx={{ padding: 2 }}>
+        <Table aria-label="collapsible table" sx={{ border: '1px solid #e0e0e0', borderRadius: '4px',  }}>
           <TableHead>
-            <TableRow>
-              <TableCell>Année</TableCell>
-              <TableCell>Titre</TableCell>
-              <TableCell>Fixation des objectifs</TableCell>
-              <TableCell>Mi-parcours</TableCell>
-              <TableCell>Final</TableCell>
-              <TableCell>Status</TableCell>
-              {canEdit && <TableCell>Action</TableCell>}
+            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+              <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', padding: '12px',borderRight: '1px solid #e0e0e0' }}>Année</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', padding: '12px',borderRight: '1px solid #e0e0e0' }}>Titre</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', padding: '12px',borderRight: '1px solid #e0e0e0' }}>Fixation des objectifs</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', padding: '12px',borderRight: '1px solid #e0e0e0' }}>Mi-parcours</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', padding: '12px',borderRight: '1px solid #e0e0e0' }}>Final</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', padding: '12px',borderRight: '1px solid #e0e0e0' }}>Status</TableCell>
+              {canEdit && 
+              <>
+              <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', padding: '12px',borderRight: '1px solid #e0e0e0' }}>Action
+              </TableCell>
               <TableCell></TableCell>
+              </>
+              }
             </TableRow>
           </TableHead>
           <TableBody>
@@ -254,16 +259,16 @@ const Liste = ({ isDataUpdated }) => {
                   </>
                 ) : (
                   <>
-                    <TableCell>{evaluation.evalAnnee}</TableCell>
-                    <TableCell>{evaluation.titre}</TableCell>
-                    <TableCell>{formatDate(evaluation.fixationObjectif)}</TableCell>
-                    <TableCell>{formatDate(evaluation.miParcours)}</TableCell>
-                    <TableCell>{formatDate(evaluation.final)}</TableCell>
-                    <TableCell style={{ color: evaluation.etatId === en_cours ? '#fcd53b' : evaluation.etatId === creer ? '#00e676' : 'blue' }}>
+                    <TableCell sx={{ borderRight: '1px solid #e0e0e0' }}>{evaluation.evalAnnee}</TableCell>
+                    <TableCell sx={{ borderRight: '1px solid #e0e0e0' }}>{evaluation.titre}</TableCell>
+                    <TableCell sx={{ borderRight: '1px solid #e0e0e0' }}>{formatDate(evaluation.fixationObjectif)}</TableCell>
+                    <TableCell sx={{ borderRight: '1px solid #e0e0e0' }}>{formatDate(evaluation.miParcours)}</TableCell>
+                    <TableCell sx={{ borderRight: '1px solid #e0e0e0' }}>{formatDate(evaluation.final)}</TableCell>
+                    <TableCell sx={{ borderRight: '1px solid #e0e0e0' }} style={{ color: evaluation.etatId === en_cours ? '#fcd53b' : evaluation.etatId === creer ? '#00e676' : 'blue' }}>
                       {evaluation.etatDesignation || 'N/A'}
                     </TableCell>
                     {canEdit && (
-                      <TableCell>
+                      <TableCell sx={{ borderRight: '1px solid #e0e0e0' }}>
                         {evaluation.etatId === creer && (
                           <Button variant="outlined" color="primary" onClick={() => debuterEvaluation(evaluation.evalId)}>
                             Débuter
@@ -281,8 +286,9 @@ const Liste = ({ isDataUpdated }) => {
                         )}
                       </TableCell>
                     )}
+                    {canEdit && (
                     <TableCell>
-                      {canEdit && (
+                      
                         <Tooltip title="Éditer">
                           <IconButton onClick={() => handleEditClick(evaluation)} disabled={evaluation.etatId === cloturer}>
                             <FontAwesomeIcon
@@ -294,8 +300,8 @@ const Liste = ({ isDataUpdated }) => {
                             />
                           </IconButton>
                         </Tooltip>
-                      )}
                     </TableCell>
+                    )}
                   </>
                 )}
               </TableRow>

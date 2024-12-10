@@ -42,18 +42,110 @@ namespace EvaluationService.Controllers
                 .ToListAsync();
         }
 
+        // [HttpPost]
+        // public async Task<IActionResult> PostEvaluation([FromBody] EvaluationDto evaluationDto, [FromQuery] string userId)
+        // {
+        //     int requiredHabilitationAdminId = 3;
+            
+        //     // Vérification de l'autorisation via le service d'autorisation
+        //     var isAuthorized = await _authorizationService.UserHasAccess(userId, requiredHabilitationAdminId);
+        //     if (!isAuthorized)
+        //     {
+        //         return Forbid("Vous n'avez pas l'autorisation d'effectuer cette action.");
+        //     }
+
+        //     var errorResponse = new ErrorResponse { Success = false };
+
+        //     // Règles de validation pour EvaluationDto
+        //     var validationRules = new Dictionary<Func<EvaluationDto, bool>, string>
+        //     {
+        //         { eval => eval.EvalAnnee < 2000 || eval.EvalAnnee > 2100, "L'année d'évaluation doit être entre 2000 et 2100." }
+        //     };
+
+        //     // Application des règles de validation
+        //     foreach (var rule in validationRules)
+        //     {
+        //         if (rule.Key(evaluationDto))
+        //         {
+        //             errorResponse.Errors.Add(rule.Value);
+        //         }
+        //     }
+
+        //     // Nouvelle étape de validation pour vérifier l'existence d'une évaluation similaire
+        //     if (!string.IsNullOrEmpty(evaluationDto.Type))
+        //     {
+        //         bool evaluationExists = await _context.Evaluations
+        //             .AnyAsync(e => e.EvalAnnee == evaluationDto.EvalAnnee && e.Type == evaluationDto.Type);
+
+        //         if (evaluationExists)
+        //         {
+        //             errorResponse.Errors.Add($"Une évaluation pour les collaborateurs {evaluationDto.Type} pour l'année {evaluationDto.EvalAnnee} existe déjà.");
+        //         }
+        //     }
+        //     else
+        //     {
+        //         errorResponse.Errors.Add("Le type d'évaluation est requis.");
+        //     }
+
+        //     if (errorResponse.Errors.Any())
+        //     {
+        //         return BadRequest(new { Success = false, Errors = errorResponse.Errors });
+        //     }
+
+        //     // Récupération du template
+        //     var template = await _context.FormTemplates.FirstOrDefaultAsync(t => t.TemplateId == evaluationDto.TemplateId);
+        //     if (template == null)
+        //     {
+        //         return NotFound(new { Success = false, Message = "Template non trouvé." });
+        //     }
+
+        //     decimal competenceWeightTotal = 0;
+        //     decimal indicatorWeightTotal = 0;
+
+        //     // Récupérer la pondération uniquement si le type n'est pas "Cadre"
+        //     if (evaluationDto.Type == "NonCadre")
+        //     {
+        //         var userEvaluationWeights = await _context.UserEvaluationWeights.FirstOrDefaultAsync(w => w.TemplateId == evaluationDto.TemplateId);
+        //         if (userEvaluationWeights == null)
+        //         {
+        //             return NotFound(new { Success = false, Message = "Pondération pour le template non trouvée." });
+        //         }
+
+        //         competenceWeightTotal = userEvaluationWeights.CompetenceWeightTotal;
+        //         indicatorWeightTotal = userEvaluationWeights.IndicatorWeightTotal;
+        //     }
+
+        //     var evaluation = new Evaluation
+        //     {
+        //         EvalAnnee = evaluationDto.EvalAnnee,
+        //         FixationObjectif = evaluationDto.FixationObjectif,
+        //         MiParcours = evaluationDto.MiParcours,
+        //         Final = evaluationDto.Final,
+        //         EtatId = evaluationDto.EtatId,
+        //         TemplateId = evaluationDto.TemplateId,
+        //         Titre = evaluationDto.Titre,
+        //         Type = evaluationDto.Type,
+        //         CompetenceWeightTotal = competenceWeightTotal,
+        //         IndicatorWeightTotal = indicatorWeightTotal
+        //     };
+
+        //     try
+        //     {
+        //         _context.Evaluations.Add(evaluation);
+        //         await _context.SaveChangesAsync();
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         return StatusCode(500, new { Success = false, Message = $"Une erreur est survenue lors de l'ajout de l'évaluation: {ex.Message}" });
+        //     }
+
+        //     return Ok(new { Success = true, Message = "Évaluation ajoutée avec succès." });
+        // }
+
         [HttpPost]
         public async Task<IActionResult> PostEvaluation([FromBody] EvaluationDto evaluationDto, [FromQuery] string userId)
         {
-            int requiredHabilitationAdminId = 1;
-            // Vérification de l'autorisation via le service d'autorisation
-            var isAuthorized = await _authorizationService.UserHasAccess(userId, requiredHabilitationAdminId);
-            if (!isAuthorized)
-            {
-                return Forbid("Vous n'avez pas l'autorisation d'effectuer cette action.");
-            }
-
-            var errorMessages = new List<string>();
+            var errorResponse = new ErrorResponse { Success = false };
 
             // Règles de validation pour EvaluationDto
             var validationRules = new Dictionary<Func<EvaluationDto, bool>, string>
@@ -66,16 +158,32 @@ namespace EvaluationService.Controllers
             {
                 if (rule.Key(evaluationDto))
                 {
-                    errorMessages.Add(rule.Value);
+                    errorResponse.Errors.Add(rule.Value);
                 }
             }
 
-            if (errorMessages.Any())
+            // Nouvelle étape de validation pour vérifier l'existence d'une évaluation similaire
+            if (!string.IsNullOrEmpty(evaluationDto.Type))
             {
-                return BadRequest(new { Success = false, Errors = errorMessages });
+                bool evaluationExists = await _context.Evaluations
+                    .AnyAsync(e => e.EvalAnnee == evaluationDto.EvalAnnee && e.Type == evaluationDto.Type);
+
+                if (evaluationExists)
+                {
+                    errorResponse.Errors.Add($"Une évaluation pour les collaborateurs {evaluationDto.Type} pour l'année {evaluationDto.EvalAnnee} existe déjà.");
+                }
+            }
+            else
+            {
+                errorResponse.Errors.Add("Le type d'évaluation est requis.");
             }
 
-            // Fetching the template
+            if (errorResponse.Errors.Any())
+            {
+                return BadRequest(new { Success = false, Errors = errorResponse.Errors });
+            }
+
+            // Récupération du template
             var template = await _context.FormTemplates.FirstOrDefaultAsync(t => t.TemplateId == evaluationDto.TemplateId);
             if (template == null)
             {
@@ -124,6 +232,7 @@ namespace EvaluationService.Controllers
 
             return Ok(new { Success = true, Message = "Évaluation ajoutée avec succès." });
         }
+
 
 
 
@@ -270,18 +379,77 @@ namespace EvaluationService.Controllers
         }
 
 
+        // [HttpPut("edit/{evalId}")]
+        // public async Task<IActionResult> ModifyEvaluation(int evalId, [FromBody] EvaluationDto evaluationDto, [FromQuery] string userId)
+        // {
+        //     int requiredHabilitationAdminId = 4;
+
+        //     // Vérification de l'autorisation via le service d'autorisation
+        //     var isAuthorized = await _authorizationService.UserHasAccess(userId, requiredHabilitationAdminId);
+        //     if (!isAuthorized)
+        //     {
+        //         return Forbid("Vous n'avez pas l'autorisation d'effectuer cette action.");
+        //     }
+
+        //     var errorMessages = new List<string>();
+
+        //     // Dictionnaire des validations pour EvaluationDto
+        //     var validationRules = new Dictionary<Func<EvaluationDto, bool>, string>
+        //     {
+        //         { eval => eval.EvalAnnee < 2000 || eval.EvalAnnee > 2100, "L'année d'évaluation doit être entre 2000 et 2100." }
+        //     };
+
+        //     // Vérification des règles de validation
+        //     foreach (var rule in validationRules)
+        //     {
+        //         if (rule.Key(evaluationDto))
+        //         {
+        //             errorMessages.Add(rule.Value);
+        //         }
+        //     }
+
+        //     // Si des erreurs de validation sont présentes, renvoyer une réponse BadRequest
+        //     if (errorMessages.Count > 0)
+        //     {
+        //         return BadRequest(new
+        //         {
+        //             Success = false,
+        //             Errors = errorMessages
+        //         });
+        //     }
+
+        //     // Récupérer l'évaluation existante
+        //     var evaluation = await _context.Evaluations.FirstOrDefaultAsync(e => e.EvalId == evalId);
+        //     if (evaluation == null)
+        //     {
+        //         return NotFound(new { Success = false, Message = "Évaluation non trouvée." });
+        //     }
+
+        //     // Mettre à jour uniquement les champs spécifiés de l'évaluation
+        //     evaluation.EvalAnnee = evaluationDto.EvalAnnee;
+        //     evaluation.FixationObjectif = evaluationDto.FixationObjectif;
+        //     evaluation.MiParcours = evaluationDto.MiParcours;
+        //     evaluation.Final = evaluationDto.Final;
+        //     evaluation.TemplateId = evaluationDto.TemplateId;
+        //     evaluation.Titre = evaluationDto.Titre;
+
+        //     // Sauvegarder les modifications dans la base de données
+        //     try
+        //     {
+        //         _context.Evaluations.Update(evaluation);
+        //         await _context.SaveChangesAsync();
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         return StatusCode(500, new { Success = false, Message = $"Une erreur est survenue lors de la sauvegarde : {ex.Message}" });
+        //     }
+
+        //     return Ok(new { Success = true, Message = "Évaluation modifiée avec succès." });
+        // }
+
         [HttpPut("edit/{evalId}")]
-        public async Task<IActionResult> ModifyEvaluation(int evalId, [FromBody] EvaluationDto evaluationDto, [FromQuery] string userId)
+        public async Task<IActionResult> ModifyEvaluation(int evalId, [FromBody] EvaluationDto evaluationDto)
         {
-            int requiredHabilitationAdminId = 2;
-
-            // Vérification de l'autorisation via le service d'autorisation
-            var isAuthorized = await _authorizationService.UserHasAccess(userId, requiredHabilitationAdminId);
-            if (!isAuthorized)
-            {
-                return Forbid("Vous n'avez pas l'autorisation d'effectuer cette action.");
-            }
-
             var errorMessages = new List<string>();
 
             // Dictionnaire des validations pour EvaluationDto
@@ -385,6 +553,7 @@ namespace EvaluationService.Controllers
             bool hasAccess = await _authorizationService.UserHasAccess(userId, requiredHabilitationAdminId);
             return Ok(new { userId, requiredHabilitationAdminId, hasAccess });
         }
+        
 
     }
 
@@ -392,4 +561,16 @@ namespace EvaluationService.Controllers
     {
         public string CurrentPeriod { get; set; }
     }
+
+    public class ErrorResponse
+    {
+        public bool Success { get; set; }
+        public List<string> Errors { get; set; }
+
+        public ErrorResponse()
+        {
+            Errors = new List<string>();
+        }
+    }
+
 }

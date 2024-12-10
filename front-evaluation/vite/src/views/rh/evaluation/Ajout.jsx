@@ -1,8 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import MainCard from 'ui-component/cards/MainCard';
-import { Grid, Typography, TextField, Button, Alert, Select, MenuItem } from '@mui/material';
+import {
+  Grid,
+  Typography,
+  TextField,
+  Button,
+  Alert,
+  Select,
+  MenuItem,
+  FormHelperText,
+  FormControl,
+  InputLabel,
+} from '@mui/material';
 import { formulaireInstance } from '../../../axiosConfig';
-import { useNavigate } from 'react-router-dom'; // Import du hook useNavigate
+import { useNavigate } from 'react-router-dom';
 
 const Ajout = () => {
   const [isDataUpdated, setIsDataUpdated] = useState(false);
@@ -15,14 +26,14 @@ const Ajout = () => {
     etatId: 1,
     templateId: '',
     titre: '',
-    type: '', // Ajout du champ type initialisé vide
+    type: '',
   });
 
-  const [message, setMessage] = useState('');
+  const [errors, setErrors] = useState({});
+  const [backendErrors, setBackendErrors] = useState([]);
   const [successMessage, setSuccessMessage] = useState('');
-  const navigate = useNavigate(); // Initialisez le hook useNavigate
+  const navigate = useNavigate();
 
-  // Vérifie l'existence de l'utilisateur dans le localStorage
   const user = JSON.parse(localStorage.getItem('user')) || {};
   const userId = user.id;
 
@@ -31,7 +42,6 @@ const Ajout = () => {
       try {
         const response = await formulaireInstance.get('/Template/GetAllTemplates');
         setTemplates(response.data);
-        console.log(response.data);
       } catch (error) {
         console.error("Erreur lors de la récupération des templates:", error);
       }
@@ -42,26 +52,107 @@ const Ajout = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
+
+    if (name === 'type') {
+      if (value === 'Cadre') {
+        setFormData({
+          ...formData,
+          type: value,
+          templateId: 1, // Définit automatiquement templateId à 1 pour "Cadre"
+        });
+      } else if (value === 'NonCadre') {
+        setFormData({
+          ...formData,
+          type: value,
+          templateId: 2, // Définit automatiquement templateId à 2 pour "NonCadre"
+        });
+      } else {
+        setFormData({
+          ...formData,
+          type: value,
+          templateId: '', // Réinitialise templateId si ce n'est ni "Cadre" ni "NonCadre"
+        });
+      }
+
+      // Efface les erreurs liées au type et au templateId si nécessaire
+      setErrors((prevErrors) => ({
+        ...prevErrors,
+        type: '',
+        templateId: '',
+      }));
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value,
+      });
+
+      // Efface les erreurs pour le champ modifié
+      setErrors((prevErrors) => ({
+        ...prevErrors,
+        [name]: '',
+      }));
+    }
+  };
+
+  const validate = () => {
+    const newErrors = {};
+
+    // Validation pour "Année"
+    if (!formData.evalAnnee) {
+      newErrors.evalAnnee = "L'année est requise.";
+    } else if (!/^\d+$/.test(formData.evalAnnee)) {
+      newErrors.evalAnnee = "L'année doit être un entier.";
+    } else if (parseInt(formData.evalAnnee) < 2000 || parseInt(formData.evalAnnee) > 2100) {
+      newErrors.evalAnnee = "L'année d'évaluation doit être entre 2000 et 2100.";
+    }
+
+    // Validation pour "Titre"
+    if (!formData.titre) {
+      newErrors.titre = "Le titre est requis.";
+    }
+
+    // Validation pour "Type"
+    if (!formData.type) {
+      newErrors.type = "Le type d'évaluation est requis.";
+    }
+
+    // Validation pour "Template ID" (uniquement si type n'est ni "Cadre" ni "NonCadre")
+    if (formData.type !== 'Cadre' && formData.type !== 'NonCadre' && !formData.templateId) {
+      newErrors.templateId = "Un formulaire doit être sélectionné.";
+    }
+
+    // Validation pour les dates
+    if (!formData.fixationObjectif) {
+      newErrors.fixationObjectif = "La date de fixation des objectifs est requise.";
+    }
+    if (!formData.miParcours) {
+      newErrors.miParcours = "La date de mi-parcours est requise.";
+    }
+    if (!formData.final) {
+      newErrors.final = "La date finale est requise.";
+    }
+
+    return newErrors;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const validationErrors = validate();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      setBackendErrors([]);
+      setSuccessMessage('');
+      return;
+    }
+
     try {
       const response = await formulaireInstance.post(`/Periode?userId=${userId}`, formData);
 
-      if (response.data.Success === false) {
-        setMessage(response.data.Errors.join(', ')); // Affiche les messages d'erreur du backend
-        setSuccessMessage('');
-      } else {
-        setMessage('');
-        setSuccessMessage(response.data.Message); // Affiche le message de succès
+      if (response.data.Success) {
+        setBackendErrors([]);
         setIsDataUpdated(true);
 
-        // Réinitialiser les champs du formulaire
+        // Réinitialiser les champs
         setFormData({
           evalAnnee: '',
           fixationObjectif: '',
@@ -73,15 +164,18 @@ const Ajout = () => {
           type: '',
         });
 
-
         navigate('/evaluation/listeEvaluation');
+      } else {
+        // Dans le cas où le backend retourne Success: false avec HTTP 200
+        setBackendErrors(response.data.errors || []);
+        setSuccessMessage('');
       }
     } catch (error) {
-      const errors = error.response?.data?.Errors;
+      const errors = error.response?.data?.errors;
       if (errors && Array.isArray(errors)) {
-        setMessage(errors.join(', '));
+        setBackendErrors(errors);
       } else {
-        setMessage(error.response?.data?.Message || 'Une erreur est survenue.');
+        setBackendErrors([error.response?.data?.message || 'Une erreur est survenue.']);
       }
       setSuccessMessage('');
     }
@@ -92,6 +186,12 @@ const Ajout = () => {
       setIsDataUpdated(false);
     }
   }, [isDataUpdated]);
+
+  // Trouver le nom du template par templateId
+  const getTemplateNameById = (id) => {
+    const template = templates.find(t => t.templateId === id);
+    return template ? template.name : '';
+  };
 
   return (
     <MainCard>
@@ -108,11 +208,18 @@ const Ajout = () => {
         </Grid>
       </Grid>
 
-      {message && (
+      {/* Affichage des messages d'erreur du backend */}
+      {backendErrors.length > 0 && (
         <Alert severity="error" style={{ margin: '20px' }}>
-          {message}
+          <ul style={{ margin: 0, paddingLeft: '20px' }}>
+            {backendErrors.map((error, index) => (
+              <li key={index}>{error}</li>
+            ))}
+          </ul>
         </Alert>
       )}
+
+      {/* Affichage du message de succès */}
       {successMessage && (
         <Alert severity="success" style={{ margin: '20px' }}>
           {successMessage}
@@ -121,58 +228,104 @@ const Ajout = () => {
 
       <form onSubmit={handleSubmit}>
         <Grid container spacing={3} mt={3}>
-          <Grid item xs={12}>
+          {/* Première rangée */}
+          <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
               label="Année"
               name="evalAnnee"
               value={formData.evalAnnee}
               onChange={handleChange}
+              error={!!errors.evalAnnee}
+              helperText={errors.evalAnnee}
+              inputProps={{
+                maxLength: 4,
+                minLength: 4,
+                inputMode: 'numeric',
+                pattern: '[0-9]*',
+              }}
             />
           </Grid>
-          <Grid item xs={12}>
+          <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
               label="Titre"
               name="titre"
               value={formData.titre}
               onChange={handleChange}
+              error={!!errors.titre}
+              helperText={errors.titre}
             />
           </Grid>
-          <Grid item xs={12}>
-            <Select
-              fullWidth
-              name="type"
-              value={formData.type}
-              onChange={handleChange}
-              displayEmpty
-            >
-              <MenuItem value="" disabled>
-                Sélectionner le type d'évaluation
-              </MenuItem>
-              <MenuItem value="Cadre">Cadre</MenuItem>
-              <MenuItem value="NonCadre">Non Cadre</MenuItem>
-            </Select>
-          </Grid>
-          <Grid item xs={12}>
-            <Select
-              fullWidth
-              name="templateId"
-              value={formData.templateId}
-              onChange={handleChange}
-              displayEmpty
-            >
-              <MenuItem value="" disabled>
-                Sélectionner un formulaire
-              </MenuItem>
-              {templates.map((template) => (
-                <MenuItem key={template.templateId} value={template.templateId}>
-                  {template.name}
+
+          {/* Deuxième rangée */}
+          <Grid item xs={12} sm={6}>
+            <FormControl fullWidth error={!!errors.type}>
+              <InputLabel id="type-label">Type d'évaluation</InputLabel>
+              <Select
+                labelId="type-label"
+                name="type"
+                value={formData.type}
+                onChange={handleChange}
+                label="Type d'évaluation"
+              >
+                <MenuItem value="">
+                  <em>Sélectionner le type d'évaluation</em>
                 </MenuItem>
-              ))}
-            </Select>
+                <MenuItem value="Cadre">Cadre</MenuItem>
+                <MenuItem value="NonCadre">Non Cadre</MenuItem>
+              </Select>
+              <FormHelperText>{errors.type}</FormHelperText>
+            </FormControl>
           </Grid>
-          <Grid item xs={12}>
+          <Grid item xs={12} sm={6}>
+            <FormControl fullWidth error={!!errors.templateId}>
+              <InputLabel id="template-label">Formulaire</InputLabel>
+              <Select
+                labelId="template-label"
+                name="templateId"
+                value={
+                  formData.type === 'Cadre'
+                    ? 1
+                    : formData.type === 'NonCadre'
+                    ? 2
+                    : formData.templateId
+                }
+                onChange={handleChange}
+                label="Formulaire"
+                disabled={
+                  !formData.type ||
+                  formData.type === 'Cadre' ||
+                  formData.type === 'NonCadre'
+                }
+              >
+                <MenuItem value="">
+                  {formData.type
+                    ? formData.type === 'Cadre' || formData.type === 'NonCadre'
+                      ? 'Formulaire défini automatiquement'
+                      : 'Sélectionner un formulaire'
+                    : 'Choisissez un type d\'évaluation d\'abord'}
+                </MenuItem>
+                {(formData.type === 'Cadre' || formData.type === 'NonCadre') && (
+                  <MenuItem
+                    value={formData.type === 'Cadre' ? 1 : 2}
+                  >
+                    {getTemplateNameById(formData.type === 'Cadre' ? 1 : 2)}
+                  </MenuItem>
+                )}
+                {formData.type !== 'Cadre' && formData.type !== 'NonCadre' &&
+                  templates.map((template) => (
+                    <MenuItem key={template.templateId} value={template.templateId}>
+                      {template.name}
+                    </MenuItem>
+                  ))}
+              </Select>
+              <FormHelperText>{errors.templateId}</FormHelperText>
+            </FormControl>
+          </Grid>
+
+          {/* Troisième rangée */}
+          <Grid item xs={12} sm={4}>
             <TextField
               fullWidth
               label="Fixation des objectifs"
@@ -183,9 +336,11 @@ const Ajout = () => {
               InputLabelProps={{
                 shrink: true,
               }}
+              error={!!errors.fixationObjectif}
+              helperText={errors.fixationObjectif}
             />
           </Grid>
-          <Grid item xs={12}>
+          <Grid item xs={12} sm={4}>
             <TextField
               fullWidth
               label="Mi-parcours"
@@ -196,9 +351,11 @@ const Ajout = () => {
               InputLabelProps={{
                 shrink: true,
               }}
+              error={!!errors.miParcours}
+              helperText={errors.miParcours}
             />
           </Grid>
-          <Grid item xs={12}>
+          <Grid item xs={12} sm={4}>
             <TextField
               fullWidth
               label="Final"
@@ -209,9 +366,13 @@ const Ajout = () => {
               InputLabelProps={{
                 shrink: true,
               }}
+              error={!!errors.final}
+              helperText={errors.final}
             />
           </Grid>
-          <Grid item xs={12}>
+
+          {/* Bouton d'envoi */}
+          <Grid item xs={1}>
             <Grid container justifyContent="flex-end" mt={2}>
               <Button type="submit" variant="contained" color="primary">
                 Ajouter

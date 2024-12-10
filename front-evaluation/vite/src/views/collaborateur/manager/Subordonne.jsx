@@ -11,11 +11,65 @@ const Subordonne = () => {
   const [currentPeriodNonCadre, setCurrentPeriodNonCadre] = useState('');
   const [currentPeriodCadre, setCurrentPeriodCadre] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadingPermissions, setLoadingPermissions] = useState(true);
+  const [permissions, setPermissions] = useState({});
   const [error, setError] = useState(null);
   const user = JSON.parse(localStorage.getItem('user')) || {};
   const userId = user.id;
 
   const navigate = useNavigate();
+
+  const SUBORDINATE_TYPE_TO_HABILITATION_ID = {
+    Cadre: 16,
+    NonCadre: 20,
+  };
+  
+  const [canViewArchive, setCanViewArchive] = useState(false);  
+  const VIEW_ARCHIVE = 26;
+  
+  // Fonction pour vérifier une permission pour un type de subordonné
+  const checkPermissionForSubordinateType = async (userId, subordinateType) => {
+    const requiredHabilitationId = SUBORDINATE_TYPE_TO_HABILITATION_ID[subordinateType];
+  
+    if (!requiredHabilitationId) {
+      console.error(`Aucun identifiant d'habilitation trouvé pour le type de subordonné : ${subordinateType}`);
+      return false;
+    }
+  
+    try {
+      const response = await formulaireInstance.get('/Periode/test-authorization', {
+        params: {
+          userId,
+          requiredHabilitationAdminId: requiredHabilitationId,
+        },
+      });
+      return response.data.hasAccess;
+    } catch (error) {
+      console.error('Erreur lors de la vérification de l\'autorisation :', error);
+      return false;
+    }
+  };
+  
+  // Fonction pour vérifier une permission spécifique (comme VIEW_ARCHIVE)
+  const checkPermission = async (userId, habilitationId) => {
+    if (!habilitationId) {
+      console.error(`Aucun identifiant d'habilitation fourni : ${habilitationId}`);
+      return false;
+    }
+  
+    try {
+      const response = await formulaireInstance.get('/Periode/test-authorization', {
+        params: {
+          userId,
+          requiredHabilitationAdminId: habilitationId,
+        },
+      });
+      return response.data.hasAccess;
+    } catch (error) {
+      console.error('Erreur lors de la vérification de l\'autorisation :', error);
+      return false;
+    }
+  };
 
   useEffect(() => {
     const fetchSubordinates = async () => {
@@ -47,6 +101,40 @@ const Subordonne = () => {
 
     fetchSubordinates();
   }, []);
+
+  // Chargement des permissions
+  useEffect(() => {
+  const fetchPermissions = async () => {
+    setLoadingPermissions(true);
+
+    const permissionsMap = {};
+    const user = JSON.parse(localStorage.getItem('user')) || {};
+    const userId = user.id;
+
+    try {
+      for (const subordinate of subordinates) {
+        const hasPermission = await checkPermissionForSubordinateType(userId, subordinate.typeUser);
+        permissionsMap[subordinate.id] = hasPermission;
+      }
+
+      // Vérification de l'habilitation pour voir les archives
+      const canView = await checkPermission(userId, VIEW_ARCHIVE);
+      setCanViewArchive(canView);
+
+      setPermissions(permissionsMap);
+    } catch (error) {
+      console.error('Erreur lors de la récupération des permissions :', error);
+    } finally {
+      setLoadingPermissions(false);
+    }
+  };
+
+  if (subordinates.length > 0) {
+    fetchPermissions();
+  } else {
+    setLoadingPermissions(false);
+  }
+}, [subordinates]);
 
   const handleFlagClick = (subordinateId, typeUser) => {
     if (typeUser === 'Cadre') {
@@ -90,7 +178,7 @@ const Subordonne = () => {
                 >
                   <Box>
                     <Typography variant="subtitle1" sx={{ color: '#E8EAF6' }}>
-                      Période Cadre
+                      Cadre
                     </Typography>
                     <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#FFFFFF' }}>
                       {currentPeriodCadre || 'Aucune évaluation en cours'}
@@ -121,7 +209,7 @@ const Subordonne = () => {
                   }}
                 >
                   <Box>
-                    <Typography variant="subtitle1">Période Non Cadre</Typography>
+                    <Typography variant="subtitle1">Non Cadre</Typography>
                     <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#3949AB' }}>
                       {currentPeriodNonCadre || 'Aucune évaluation en cours'}
                     </Typography>
@@ -216,17 +304,20 @@ const Subordonne = () => {
                         </Button>
 
                         {/* Bouton Evaluation */}
-                        <Button
-                          variant="contained"
-                          size="small"
-                          color="secondary"
-                          sx={{ textTransform: 'none', flexGrow: 1 }}
-                          onClick={() => handleFlagClick(subordinate.id, subordinate.typeUser)}
-                        >
-                          Evaluation
-                        </Button>
+                        {permissions[subordinate.id] && (
+                          <Button
+                            variant="contained"
+                            size="small"
+                            color="secondary"
+                            sx={{ textTransform: 'none', flexGrow: 1 }}
+                            onClick={() => handleFlagClick(subordinate.id, subordinate.typeUser)}
+                          >
+                            Évaluation
+                          </Button>
+                        )}
 
                         {/* Bouton Archive */}
+                        {canViewArchive && (
                         <Button
                           variant="contained"
                           size="small"
@@ -251,6 +342,7 @@ const Subordonne = () => {
                         >
                           Archive
                         </Button>
+                        )}
                       </Box>
                     </Paper>
                   </Grid>

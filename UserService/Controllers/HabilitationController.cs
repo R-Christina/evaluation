@@ -122,6 +122,87 @@ namespace UserService.Controllers
             }
         }
 
+        
+        [HttpPut("editHabilitation/{id}")]
+        public async Task<ActionResult<HabilitationIDLabelDto>> UpdateHabilitationAsync(
+            int id,
+            UpdateHabilitationDto updateDto)
+        {
+            if (updateDto == null)
+            {
+                return BadRequest("Les données de mise à jour sont invalides.");
+            }
+
+            try
+            {
+                // Rechercher l'habilitation dans la base de données
+                var habilitation = await _context.Habilitations
+                    .Include(h => h.HabilitationAdmins)
+                    .FirstOrDefaultAsync(h => h.Id == id);
+
+                if (habilitation == null)
+                {
+                    return NotFound($"L'habilitation avec l'ID {id} n'existe pas.");
+                }
+
+                // Mise à jour du label si fourni
+                if (!string.IsNullOrEmpty(updateDto.Label))
+                {
+                    habilitation.Label = updateDto.Label;
+                }
+
+                // Ajout de nouveaux administrateurs si spécifiés
+                if (updateDto.AddedHabilitationAdmins != null)
+                {
+                    foreach (var adminDto in updateDto.AddedHabilitationAdmins)
+                    {
+                        var admin = await _context.HabilitationAdmins.FindAsync(adminDto.Id);
+                        if (admin != null && !habilitation.HabilitationAdmins.Any(a => a.Id == admin.Id))
+                        {
+                            habilitation.HabilitationAdmins.Add(admin);
+                        }
+                    }
+                }
+
+                // Suppression d'administrateurs existants si spécifiés
+                if (updateDto.RemovedHabilitationAdmins != null)
+                {
+                    var adminsToRemove = habilitation.HabilitationAdmins
+                        .Where(a => updateDto.RemovedHabilitationAdmins.Any(r => r.Id == a.Id))
+                        .ToList();
+
+                    foreach (var admin in adminsToRemove)
+                    {
+                        habilitation.HabilitationAdmins.Remove(admin);
+                    }
+                }
+
+                // Enregistrer les modifications
+                await _context.SaveChangesAsync();
+
+                // Mapper et retourner l'habilitation mise à jour
+                var updatedDto = new HabilitationIDLabelDto
+                {
+                    Id = habilitation.Id,
+                    Label = habilitation.Label,
+                    HabilitationAdmins = habilitation.HabilitationAdmins
+                        .Select(a => new HabilitationUniqAdminDto
+                        {
+                            Id = a.Id,
+                            Name = a.Name
+                        })
+                        .ToList()
+                };
+
+                return Ok(updatedDto);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Erreur serveur interne : {ex.Message}");
+            }
+        }
+
+
 
         // Get all HabilitationAdmins
         [HttpGet("admins")]
@@ -226,4 +307,18 @@ namespace UserService.Controllers
             }
         }
     }
+
+    public class UpdateHabilitationDto
+    {   
+        public string? Label { get; set; }
+        public List<HabilitationAdminDto>? AddedHabilitationAdmins { get; set; }
+        public List<HabilitationAdminDto>? RemovedHabilitationAdmins { get; set; }
+    }
+
+    public class HabilitationAdminDto
+    {
+        public int Id { get; set; }
+    }
+
+
 }

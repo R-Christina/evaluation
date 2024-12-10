@@ -24,29 +24,24 @@ const Fixation = () => {
   const [isFinaleValidated, setIsFinaleValidated] = useState(false);
 
   const checkIfIValidate = async () => {
+    setError(null); // Réinitialise les erreurs précédentes
+    setSuccessMessage(null);
+  
     try {
-      setError(null); // Réinitialise les erreurs précédentes
-      setSuccessMessage(null);
-
       const response = await formulaireInstance.get('/Evaluation/getUserObjectivesHistory', {
         params: { userId: subordinateId, type: typeUser }
       });
-
-      // Extraire le tableau `historyCFos` depuis `response.data`
+  
+      // Extraire et vérifier si `historyCFos` est défini et contient des éléments
       const history = response.data.historyCFos;
-
-      // Vérifier si le tableau contient des validations
-      if (Array.isArray(history) && history.length > 0) {
-        setIsValidated(true);
-      } else {
-        setIsValidated(false);
-      }
+      setIsValidated(Array.isArray(history) && history.length > 0);
     } catch (err) {
       console.error('Erreur lors de la vérification des validations:', err.response?.data || err.message);
-      const message = err.response?.data?.message || err.message || 'Erreur lors de la vérification des validations.';
-      setError(message);
+      // Ne pas montrer d'erreur à l'utilisateur mais assurer un état logique
+      setIsValidated(false); // Par défaut, considéré comme non validé
     }
   };
+  
 
   const fetchUserObjectives = async (evalId, userId) => {
     try {
@@ -161,6 +156,7 @@ const Fixation = () => {
               : column.value || ''
             }))
           };
+
 
           // Add specific fields based on the period
           if (currentPeriod === 'Fixation Objectif') {
@@ -302,7 +298,7 @@ const Fixation = () => {
               <>
                 {isValidated ? (
                   <Alert severity="success" sx={{ mb: 3 }}>
-                    Les objectifs ont déjà été validés pour la période de "Fixation Objectif".
+                    Les objectifs ont déjà été validés pour la période de fixation des objectifs
                   </Alert>
                 ) : (
                   <>
@@ -738,7 +734,7 @@ const Fixation = () => {
                       <Alert severity="info">Aucun objectif défini pour la période d'évaluation finale</Alert>
                     )}
 
-                    <Box display="flex" justifyContent="center" mt={4}>
+                    <Box display="flex" justifyContent="left" mt={4}>
                       <Button variant="contained" color="primary" onClick={handleValidationHistory}>
                         Valider
                       </Button>

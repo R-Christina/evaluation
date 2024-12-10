@@ -6,14 +6,15 @@ namespace UserService.Models
 {
     public enum EmployeeType
     {
-        Cadre,
-        NonCadre
+        Cadre = 0,
+        NonCadre = 1
     }
 
     public class User
     {
         [Key]
-        public string Id { get; set; }              
+        public string Id { get; set; } 
+        public string Matricule {get; set;}             
         public string Name { get; set; }            
         public string Email { get; set; }           
         public string? Poste { get; set; }           
@@ -21,6 +22,7 @@ namespace UserService.Models
         public string? SuperiorId { get; set; }      
         public string? SuperiorName { get; set; }
         public string? Status { get; set; }
+        public string? Signature {get;set;}
         
         public EmployeeType? TypeUser { get; set; }
         public List<Habilitation> Habilitations { get; set; }

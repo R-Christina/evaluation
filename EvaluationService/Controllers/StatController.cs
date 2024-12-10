@@ -20,12 +20,76 @@ namespace EvaluationService.Controllers
 
         //---------------------------------------------------------------------------------Cadre
 
+        // [HttpGet("getScoreByPhase/{userId}/{phase}")]
+        // public IActionResult GetScoreByPhase(string userId, string phase)
+        // {
+        //     if (phase.Equals("Fixation", StringComparison.OrdinalIgnoreCase))
+        //     {
+        //         // Retourner uniquement la pondération totale pour chaque année d'évaluation
+        //         var fixationData = _context.HistoryCFos
+        //             .Join(_context.UserEvaluations,
+        //                 hcf => hcf.UserEvalId,
+        //                 ue => ue.UserEvalId,
+        //                 (hcf, ue) => new { hcf, ue })
+        //             .Join(_context.Evaluations,
+        //                 combined => combined.ue.EvalId,
+        //                 e => e.EvalId,
+        //                 (combined, e) => new { combined.hcf, combined.ue, e })
+        //             .Where(result => result.ue.UserId == userId && result.e.Type == "Cadre")
+        //             .GroupBy(result => result.e.EvalAnnee)
+        //             .Select(group => new
+        //             {
+        //                 EvaluationYear = group.Key,
+        //                 TotalWeighting = Math.Truncate(group.Sum(item => item.hcf.Weighting * 0) * 100) / 100
+        //             })
+        //             .ToList();
+
+        //         if (!fixationData.Any())
+        //         {
+        //             return NotFound(new { message = "No fixation data found for the specified user." });
+        //         }
+
+        //         return Ok(fixationData);
+        //     }
+        //     else if (phase.Equals("Mi-Parcours", StringComparison.OrdinalIgnoreCase))
+        //     {
+        //         // Calculer le score basé sur le résultat et la pondération
+        //         var miParcoursScores = _context.HistoryCMps
+        //             .Join(_context.UserEvaluations,
+        //                 hcm => hcm.UserEvalId,
+        //                 ue => ue.UserEvalId,
+        //                 (hcm, ue) => new { hcm, ue })
+        //             .Join(_context.Evaluations,
+        //                 combined => combined.ue.EvalId,
+        //                 e => e.EvalId,
+        //                 (combined, e) => new { combined.hcm, combined.ue, e })
+        //             .Where(result => result.ue.UserId == userId && result.e.Type == "Cadre")
+        //             .GroupBy(result => result.e.EvalAnnee)
+        //             .Select(group => new
+        //             {
+        //                 EvaluationYear = group.Key,
+        //                 Score = Math.Truncate(group.Sum(item => (item.hcm.Weighting * item.hcm.Result) / 100) * 100) / 100
+        //             })
+        //             .ToList();
+
+        //         if (!miParcoursScores.Any())
+        //         {
+        //             return NotFound(new { message = "No mi-parcours scores found for the specified user." });
+        //         }
+
+        //         return Ok(miParcoursScores);
+        //     }
+        //     else
+        //     {
+        //         return BadRequest(new { message = "Invalid phase specified. Please specify either 'Fixation' or 'Mi-Parcours'." });
+        //     }
+        // }
+
         [HttpGet("getScoreByPhase/{userId}/{phase}")]
         public IActionResult GetScoreByPhase(string userId, string phase)
         {
             if (phase.Equals("Fixation", StringComparison.OrdinalIgnoreCase))
             {
-                // Retourner uniquement la pondération totale pour chaque année d'évaluation
                 var fixationData = _context.HistoryCFos
                     .Join(_context.UserEvaluations,
                         hcf => hcf.UserEvalId,
@@ -53,7 +117,6 @@ namespace EvaluationService.Controllers
             }
             else if (phase.Equals("Mi-Parcours", StringComparison.OrdinalIgnoreCase))
             {
-                // Calculer le score basé sur le résultat et la pondération
                 var miParcoursScores = _context.HistoryCMps
                     .Join(_context.UserEvaluations,
                         hcm => hcm.UserEvalId,
@@ -79,9 +142,36 @@ namespace EvaluationService.Controllers
 
                 return Ok(miParcoursScores);
             }
+            else if (phase.Equals("Évaluation Finale", StringComparison.OrdinalIgnoreCase))
+            {
+                var evaluationFinaleScores = _context.HistoryCFis
+                    .Join(_context.UserEvaluations,
+                        hcfi => hcfi.UserEvalId,
+                        ue => ue.UserEvalId,
+                        (hcfi, ue) => new { hcfi, ue })
+                    .Join(_context.Evaluations,
+                        combined => combined.ue.EvalId,
+                        e => e.EvalId,
+                        (combined, e) => new { combined.hcfi, combined.ue, e })
+                    .Where(result => result.ue.UserId == userId && result.e.Type == "Cadre")
+                    .GroupBy(result => result.e.EvalAnnee)
+                    .Select(group => new
+                    {
+                        EvaluationYear = group.Key,
+                        Score = Math.Truncate(group.Sum(item => (item.hcfi.Weighting * item.hcfi.Result) / 100) * 100) / 100
+                    })
+                    .ToList();
+
+                if (!evaluationFinaleScores.Any())
+                {
+                    return NotFound(new { message = "No evaluation finale scores found for the specified user." });
+                }
+
+                return Ok(evaluationFinaleScores);
+            }
             else
             {
-                return BadRequest(new { message = "Invalid phase specified. Please specify either 'Fixation' or 'Mi-Parcours'." });
+                return BadRequest(new { message = "Invalid phase specified. Please specify either 'Fixation', 'Mi-Parcours', or 'Evaluation Finale'." });
             }
         }
 
@@ -187,7 +277,7 @@ namespace EvaluationService.Controllers
             }
             else if (phase.Equals("Finale", StringComparison.OrdinalIgnoreCase))
             {
-                return _context.HistoryUserIndicatorMPs
+                return _context.HistoryUserindicatorFis
                     .Join(_context.UserEvaluations,
                         hui => hui.UserEvalId,
                         ue => ue.UserEvalId,
@@ -196,7 +286,7 @@ namespace EvaluationService.Controllers
                     .Select(result => new
                     {
                         Phase = "Finale",
-                        HistoryId = result.hui.HistoryUserIndicatorMPId,
+                        HistoryId = result.hui.HistoryUserindicatorFiId,
                         result.hui.Name,
                         result.hui.ResultText,
                         result.hui.Result
@@ -286,8 +376,6 @@ namespace EvaluationService.Controllers
 
             return Ok(scoresByYear);
         }
-
-
 
     }
 }

@@ -3,6 +3,7 @@ namespace UserService.DTOs
     public class UserAD
     {
         public string Id { get; set; }
+        public string Matricule {get; set;}
         public string DisplayName { get; set; }
         public string Email { get; set; }
         public string Title { get; set; }

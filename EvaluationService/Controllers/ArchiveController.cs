@@ -157,9 +157,9 @@ namespace EvaluationService.Controllers
                         result.hcf.PriorityName,
                         result.hcf.Description,
                         result.hcf.Weighting,
+                        result.hcf.ResultIndicator,
                         Date = result.hcf.CreatedAt,
                         EvaluationYear = result.e.EvalAnnee,
-                        ResultIndicator = (string)null,
                         Result = (string)null,
                         ColumnValues = _context.HistoryObjectiveColumnValuesFos
                             .Where(hcv => hcv.HcfId == result.hcf.HcfId)
@@ -348,69 +348,69 @@ namespace EvaluationService.Controllers
         // }
 
         [HttpGet("priority/totalWeightingAndResult/{evalId}/{userId}/{phase}")]
-public async Task<IActionResult> GetTotalWeightingAndResultByPriority(int evalId, string userId, string phase)
-{
-    var userEvalId = await GetUserEvalIdAsync(evalId, userId);
-    if (userEvalId == null)
-    {
-        return NotFound(new { message = "User evaluation not found." });
-    }
-
-    // Initialiser la requête en fonction de la phase
-    IQueryable<HistoryDto> historyQuery;
-
-    if (phase.Equals("Mi-Parcours", StringComparison.OrdinalIgnoreCase))
-    {
-        historyQuery = _context.HistoryCMps
-            .Where(h => h.UserEvalId == userEvalId)
-            .Select(h => new HistoryDto
-            {
-                PriorityName = h.PriorityName,
-                Weighting = h.Weighting,
-                Result = h.Result
-            });
-    }
-    else if (phase.Equals("Évaluation Finale", StringComparison.OrdinalIgnoreCase))
-    {
-        historyQuery = _context.HistoryCFis
-            .Where(h => h.UserEvalId == userEvalId)
-            .Select(h => new HistoryDto
-            {
-                PriorityName = h.PriorityName,
-                Weighting = h.Weighting,
-                Result = h.Result
-            });
-    }
-    else
-    {
-        return BadRequest(new { message = "Phase invalide. Utilisez 'Mi-Parcours' ou 'Évaluation Finale'." });
-    }
-
-    var totalWeightingAndResults = await historyQuery
-        .GroupBy(h => h.PriorityName)
-        .Select(g => new
+        public async Task<IActionResult> GetTotalWeightingAndResultByPriority(int evalId, string userId, string phase)
         {
-            PriorityName = g.Key,
-            TotalWeighting = Math.Truncate(g.Sum(h => h.Weighting) * 100) / 100,
-            TotalResult = Math.Truncate(g.Sum(h => (h.Weighting * h.Result) / 100) * 100) / 100
-        })
-        .ToListAsync();
+            var userEvalId = await GetUserEvalIdAsync(evalId, userId);
+            if (userEvalId == null)
+            {
+                return NotFound(new { message = "User evaluation not found." });
+            }
 
-    if (totalWeightingAndResults == null || !totalWeightingAndResults.Any())
-    {
-        return NotFound(new { message = "No data found for the specified priorities." });
-    }
+            // Initialiser la requête en fonction de la phase
+            IQueryable<HistoryDto> historyQuery;
 
-    var totalWeightingSum = totalWeightingAndResults.Sum(g => g.TotalWeighting);
-    var totalResultSum = totalWeightingAndResults.Sum(g => g.TotalResult);
+            if (phase.Equals("Mi-Parcours", StringComparison.OrdinalIgnoreCase))
+            {
+                historyQuery = _context.HistoryCMps
+                    .Where(h => h.UserEvalId == userEvalId)
+                    .Select(h => new HistoryDto
+                    {
+                        PriorityName = h.PriorityName,
+                        Weighting = h.Weighting,
+                        Result = h.Result
+                    });
+            }
+            else if (phase.Equals("Évaluation Finale", StringComparison.OrdinalIgnoreCase))
+            {
+                historyQuery = _context.HistoryCFis
+                    .Where(h => h.UserEvalId == userEvalId)
+                    .Select(h => new HistoryDto
+                    {
+                        PriorityName = h.PriorityName,
+                        Weighting = h.Weighting,
+                        Result = h.Result
+                    });
+            }
+            else
+            {
+                return BadRequest(new { message = "Phase invalide. Utilisez 'Mi-Parcours' ou 'Évaluation Finale'." });
+            }
 
-    return Ok(new
-    {
-        TotalWeightingAndResults = totalWeightingAndResults,
-        TotalWeightingSum = totalWeightingSum,
-        TotalResultSum = totalResultSum
-    });
-}
+            var totalWeightingAndResults = await historyQuery
+                .GroupBy(h => h.PriorityName)
+                .Select(g => new
+                {
+                    PriorityName = g.Key,
+                    TotalWeighting = Math.Truncate(g.Sum(h => h.Weighting) * 100) / 100,
+                    TotalResult = Math.Truncate(g.Sum(h => (h.Weighting * h.Result) / 100) * 100) / 100
+                })
+                .ToListAsync();
+
+            if (totalWeightingAndResults == null || !totalWeightingAndResults.Any())
+            {
+                return NotFound(new { message = "No data found for the specified priorities." });
+            }
+
+            var totalWeightingSum = totalWeightingAndResults.Sum(g => g.TotalWeighting);
+            var totalResultSum = totalWeightingAndResults.Sum(g => g.TotalResult);
+
+            return Ok(new
+            {
+                TotalWeightingAndResults = totalWeightingAndResults,
+                TotalWeightingSum = totalWeightingSum,
+                TotalResultSum = totalResultSum
+            });
+        }
 
 
 //------------------------------------------------------------------NonCadre---------------------------------------------------------------
@@ -521,7 +521,7 @@ public async Task<IActionResult> GetTotalWeightingAndResultByPriority(int evalId
             }
             else if (phase.Equals("Finale", StringComparison.OrdinalIgnoreCase))
             {
-                return _context.HistoryUserIndicatorMPs
+                return _context.HistoryUserindicatorFis
                     .Join(_context.UserEvaluations,
                         hui => hui.UserEvalId,
                         ue => ue.UserEvalId,
@@ -530,7 +530,7 @@ public async Task<IActionResult> GetTotalWeightingAndResultByPriority(int evalId
                     .Select(result => new
                     {
                         Phase = "Finale",
-                        HistoryId = result.hui.HistoryUserIndicatorMPId,
+                        HistoryId = result.hui.HistoryUserindicatorFiId,
                         result.hui.Name,
                         result.hui.ResultText,
                         result.hui.Result
@@ -563,7 +563,10 @@ public async Task<IActionResult> GetTotalWeightingAndResultByPriority(int evalId
             decimal competenceAvg = 0;
             if (competencesHistory.Any())
             {
-                competenceAvg = competencesHistory.Average(c => Convert.ToDecimal(c.GetType().GetProperty("Performance").GetValue(c)));
+                competenceAvg = Math.Round(
+                    competencesHistory.Average(c => Convert.ToDecimal(c.GetType().GetProperty("Performance").GetValue(c))), 
+                    2
+                );
             }
 
             // Calculer la somme des indicateurs
@@ -628,7 +631,10 @@ public async Task<IActionResult> GetTotalWeightingAndResultByPriority(int evalId
             decimal competenceAvg = 0;
             if (competencesHistory.Any())
             {
-                competenceAvg = competencesHistory.Average(c => Convert.ToDecimal(c.GetType().GetProperty("Performance").GetValue(c)));
+                competenceAvg = Math.Round(
+                    competencesHistory.Average(c => Convert.ToDecimal(c.GetType().GetProperty("Performance").GetValue(c))),
+                    2
+                );
             }
 
             // Déclaration de indicatorAvg comme nullable

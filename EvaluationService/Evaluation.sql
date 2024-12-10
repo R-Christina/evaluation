@@ -17,7 +17,8 @@ CREATE TABLE [Etats] (
     CONSTRAINT [PK_Etats] PRIMARY KEY ([EtatId])
 );
 GO
-insert into [Etats] ([EtatDesignation]) values ('Créer'),('En Cours'),('Clôturer');
+INSERT INTO [Etats] ([EtatDesignation])
+VALUES  ('Créé'), ('En cours'), ('Clôturé');
 
 CREATE TABLE [FormTemplates] (
     [TemplateId] int NOT NULL IDENTITY,

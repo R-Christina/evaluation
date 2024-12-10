@@ -8,6 +8,7 @@ const icons = { IconUsers };
 // ==============================|| DASHBOARD MENU ITEMS ||============================== //
 
 const manager = {
+  
   id: 'manager',
   title: 'Manager',
   type: 'group',
@@ -17,6 +18,7 @@ const manager = {
       title: 'Collaborateur',
       type: 'item',
       url: '/manager/subordonne',
+      requiredHabilitation: 14,
       icon: icons.IconUsers,
       breadcrumbs: false
     }
