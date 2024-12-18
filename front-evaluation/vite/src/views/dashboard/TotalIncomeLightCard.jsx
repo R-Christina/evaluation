@@ -1,4 +1,6 @@
 import PropTypes from 'prop-types';
+import React, { useEffect, useState } from 'react';
+import { authInstance } from '../../axiosConfig'; // Assuming authInstance is already configured
 
 // material-ui
 import { useTheme, styled } from '@mui/material/styles';
@@ -10,6 +12,9 @@ import ListItemAvatar from '@mui/material/ListItemAvatar';
 import ListItemText from '@mui/material/ListItemText';
 import Typography from '@mui/material/Typography';
 
+// assets
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';  // Icon for Cadre
+
 // project imports
 import MainCard from 'ui-component/cards/MainCard';
 import TotalIncomeCard from 'ui-component/cards/Skeleton/TotalIncomeCard';
@@ -18,6 +23,7 @@ import TotalIncomeCard from 'ui-component/cards/Skeleton/TotalIncomeCard';
 const CardWrapper = styled(MainCard)(({ theme }) => ({
   overflow: 'hidden',
   position: 'relative',
+  minHeight: '90px',
   '&:after': {
     content: '""',
     position: 'absolute',
@@ -42,12 +48,31 @@ const CardWrapper = styled(MainCard)(({ theme }) => ({
 
 // ==============================|| DASHBOARD - TOTAL INCOME LIGHT CARD ||============================== //
 
-const TotalIncomeLightCard = ({ isLoading, total, icon, label }) => {
+const TotalIncomeLightCard = ({ isLoading, label }) => {
   const theme = useTheme();
+  const [nonCadresCount, setCadresCount] = useState(null);
+
+  const user = JSON.parse(localStorage.getItem('user')) || {};
+  const managerId = user.id;  // Get manager ID from localStorage or other source
+
+  useEffect(() => {
+    const fetchCadresCount = async () => {
+      try {
+        const response = await authInstance.get(`/StatUser/user/subordinates/countType?superiorId=${managerId}`);
+        setCadresCount(response.data.nonCadresCount);  // Assuming the API returns the count as 'CadresCount'
+      } catch (error) {
+        console.error('Error fetching cadres count:', error);
+      }
+    };
+
+    if (managerId) {
+      fetchCadresCount();
+    }
+  }, [managerId]);
 
   return (
     <>
-      {isLoading ? (
+      {isLoading || nonCadresCount === null ? (
         <TotalIncomeCard />
       ) : (
         <CardWrapper border={false} content={false}>
@@ -64,15 +89,19 @@ const TotalIncomeLightCard = ({ isLoading, total, icon, label }) => {
                       color: label === 'Meeting attends' ? 'error.dark' : 'warning.dark'
                     }}
                   >
-                    {icon}
+                    <AdminPanelSettingsIcon fontSize="inherit" /> {/* Icon for "Cadre" */}
                   </Avatar>
                 </ListItemAvatar>
                 <ListItemText
                   sx={{ py: 0, mt: 0.45, mb: 0.45 }}
-                  primary={<Typography variant="h4">${total}k</Typography>}
+                  primary={
+                    <Typography variant="h4">
+                      {nonCadresCount} {/* Display the number of Cadres */}
+                    </Typography>
+                  }
                   secondary={
                     <Typography variant="subtitle2" sx={{ color: 'grey.500', mt: 0.5 }}>
-                      {label}
+                     Non Cadre direct
                     </Typography>
                   }
                 />
@@ -86,10 +115,8 @@ const TotalIncomeLightCard = ({ isLoading, total, icon, label }) => {
 };
 
 TotalIncomeLightCard.propTypes = {
-  icon: PropTypes.object,
-  label: PropTypes.string,
-  total: PropTypes.number,
-  isLoading: PropTypes.bool
+  label: PropTypes.string.isRequired,
+  isLoading: PropTypes.bool,
 };
 
 export default TotalIncomeLightCard;

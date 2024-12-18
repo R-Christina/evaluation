@@ -1,9 +1,9 @@
 // assets
-import { IconKey, IconUsers, IconFileImport } from '@tabler/icons-react';
+import { IconKey, IconUsers, IconFileImport, IconDashboard } from '@tabler/icons-react';
 
 // constant
 const icons = {
-  IconKey, IconUsers, IconFileImport
+  IconKey, IconUsers, IconFileImport, IconDashboard
 };
 
 // ==============================|| EXTRA PAGES MENU ITEMS ||============================== //
@@ -13,6 +13,15 @@ const admin = {
   title: 'Admin',
   type: 'group',
   children: [
+    {
+      id: 'dashboard',
+      title: 'Tableau de bord',
+      type: 'item',
+      url: '/dashboardAdmin/dashboard',
+      icon: icons.IconDashboard,
+      breadcrumbs: false
+    },
+
     {
       id: 'authentication',
       title: 'Droits et accès',
@@ -89,7 +98,7 @@ const admin = {
       title: 'Import',
       type: 'item',
       url: '/import/importCSV',
-      requiredHabilitation: 27,
+      // requiredHabilitation: 27,
       icon: icons.IconFileImport,
       breadcrumbs: false
     }

@@ -1,15 +1,14 @@
 import PropTypes from 'prop-types';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { formulaireInstance } from '../../axiosConfig';
 
 // material-ui
 import { useTheme } from '@mui/material/styles';
 import Grid from '@mui/material/Grid';
-import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 
 // third-party
-import ApexCharts from 'apexcharts';
 import Chart from 'react-apexcharts';
 
 // project imports
@@ -21,25 +20,20 @@ import { gridSpacing } from 'store/constant';
 import chartData from './chart-data/total-growth-bar-chart';
 
 const status = [
-  {
-    value: 'today',
-    label: 'Today'
-  },
-  {
-    value: 'month',
-    label: 'This Month'
-  },
-  {
-    value: 'year',
-    label: 'This Year'
-  }
+  { value: 'Évaluation Finale', label: 'Évaluation Finale' }
+  // Vous pouvez ajouter d'autres phases si nécessaire
 ];
 
-// ==============================|| DASHBOARD DEFAULT - TOTAL GROWTH BAR CHART ||============================== //
+const years = Array.from(new Array(5), (val, index) => new Date().getFullYear() - index);
 
 const TotalGrowthBarChart = ({ isLoading }) => {
-  const [value, setValue] = React.useState('today');
+  const [phase, setPhase] = useState('Évaluation Finale');
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [data, setData] = useState([]);
   const theme = useTheme();
+
+  const user = JSON.parse(localStorage.getItem('user')) || {};
+  const managerId = user.id;
 
   const { primary } = theme.palette.text;
   const divider = theme.palette.divider;
@@ -50,34 +44,50 @@ const TotalGrowthBarChart = ({ isLoading }) => {
   const secondaryMain = theme.palette.secondary.main;
   const secondaryLight = theme.palette.secondary.light;
 
-  React.useEffect(() => {
-    const newChartData = {
-      ...chartData.options,
-      colors: [primary200, primaryDark, secondaryMain, secondaryLight],
-      xaxis: {
-        labels: {
-          style: {
-            colors: [primary, primary, primary, primary, primary, primary, primary, primary, primary, primary, primary, primary]
-          }
-        }
-      },
-      yaxis: {
-        labels: {
-          style: {
-            colors: [primary]
-          }
-        }
-      },
-      grid: { borderColor: divider },
-      tooltip: { theme: 'light' },
-      legend: { labels: { colors: grey500 } }
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await formulaireInstance.get(`/Stat/subordinates/scoreComparison/${managerId}/${year}/${phase}`);
+        setData(response.data);
+      } catch (error) {
+        console.error('Erreur lors de la récupération des données:', error);
+      }
     };
 
-    // do not load chart when loading
-    if (!isLoading) {
-      ApexCharts.exec(`bar-chart`, 'updateOptions', newChartData);
+    if (managerId) {
+      fetchData();
     }
-  }, [primary200, primaryDark, secondaryMain, secondaryLight, primary, divider, isLoading, grey500]);
+  }, [managerId, year, phase]);
+
+  const chartOptions = {
+    ...chartData.options,
+    colors: [primary200, primaryDark, secondaryMain, secondaryLight],
+    xaxis: {
+      categories: data.map((item) => item.matricule),
+      labels: {
+        style: {
+          colors: Array(data.length).fill(primary)
+        }
+      }
+    },
+    yaxis: {
+      labels: {
+        style: {
+          colors: [primary]
+        }
+      }
+    },
+    grid: { borderColor: divider },
+    tooltip: { theme: 'light' },
+    legend: { labels: { colors: grey500 } }
+  };
+
+  const chartSeries = [
+    {
+      name: 'Score',
+      data: data.map((item) => item.scoreData?.score || 0)
+    }
+  ];
 
   return (
     <>
@@ -87,38 +97,31 @@ const TotalGrowthBarChart = ({ isLoading }) => {
         <MainCard>
           <Grid container spacing={gridSpacing}>
             <Grid item xs={12}>
-              <Grid container alignItems="center" justifyContent="space-between">
+              <Grid container alignItems="center" justifyContent="space-between" spacing={2}>
                 <Grid item>
-                  <Grid container direction="column" spacing={1}>
-                    <Grid item>
-                      <Typography variant="subtitle2">Total Growth</Typography>
-                    </Grid>
-                    <Grid item>
-                      <Typography variant="h3">$2,324.00</Typography>
-                    </Grid>
-                  </Grid>
+                  <Typography variant="subtitle2">Comparaison du contrat d'objectifs de vos collaborateurs directs</Typography>
                 </Grid>
                 <Grid item>
-                  <TextField id="standard-select-currency" select value={value} onChange={(e) => setValue(e.target.value)}>
-                    {status.map((option) => (
-                      <MenuItem key={option.value} value={option.value}>
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </TextField>
+                  <TextField
+                    id="year-input"
+                    label="Année"
+                    type="number"
+                    value={year}
+                    onChange={(e) => setYear(parseInt(e.target.value, 10))}
+                    variant="outlined"
+                    size="small"
+                    InputProps={{
+                      inputProps: {
+                        min: 1900,
+                        max: new Date().getFullYear() + 5
+                      }
+                    }}
+                  />
                 </Grid>
               </Grid>
             </Grid>
-            <Grid
-              item
-              xs={12}
-              sx={{
-                '& .apexcharts-menu.apexcharts-menu-open': {
-                  bgcolor: 'background.paper'
-                }
-              }}
-            >
-              <Chart {...chartData} />
+            <Grid item xs={12}>
+              <Chart options={chartOptions} series={chartSeries} type="bar" height={364} />
             </Grid>
           </Grid>
         </MainCard>

@@ -34,6 +34,9 @@ const AssignationAll = Loadable(lazy(() => import('views/admin/utilisateur/Assig
 
 const ImportCSV = Loadable(lazy(() => import('views/admin/import/index')));
 
+const DashboardAdmin = Loadable(lazy(() => import('views/admin/dashboard/index')));
+
+
 // Rh
 const ListeEval = Loadable(lazy(() => import('views/rh/evaluation/Liste')));
 const AjoutEval = Loadable(lazy(() => import('views/rh/evaluation/Ajout')));
@@ -46,8 +49,8 @@ const FormulaireNonCadre = Loadable(lazy(() => import('views/rh/formulaire/nonCa
 const Profile = Loadable(lazy(() => import('views/collaborateur/profile/index')));
 
 //evaluation
-const Remplissage = Loadable(lazy(() => import('views/collaborateur/evaluation/cadre/Remplissage')));
-const RemplissageNonCadre = Loadable(lazy(() => import('views/collaborateur/evaluation/nonCadre/Remplissage')));
+const Remplissage = Loadable(lazy(() => import('views/collaborateur/evaluation/evalCadre/CollabFo')));
+const RemplissageNonCadre = Loadable(lazy(() => import('views/collaborateur/evaluation/evalNonCadre/CollabNFo')));
 //archive
 const AllEvaluationCadre = Loadable(lazy(() => import('views/collaborateur/archive/allEvaluation/cadre/AllCadre')));
 const AllEvaluationNonCadre = Loadable(lazy(() => import('views/collaborateur/archive/allEvaluation/nonCadre/AllNonCadre')));
@@ -68,16 +71,16 @@ const AssignSignature = Loadable(lazy(() => import('views/collaborateur/profile/
 
 //manager
 const ListeSubordonne = Loadable(lazy(() => import('views/collaborateur/manager/Subordonne')));
-const FixationCadre = Loadable(lazy(() => import('views/collaborateur/manager/cadre/Fixation')));
-const FixationNonCadre = Loadable(lazy(() => import('views/collaborateur/manager/nonCadre/Fixation')));
+const ManagerCadre = Loadable(lazy(() => import('views/collaborateur/manager/managerCadre/ManagerFo')));
+const ManagerNonCadre = Loadable(lazy(() => import('views/collaborateur/manager/managerNonCadre/ManagerNFo')));
 
 
 
 //test 
-const CollabFo = Loadable(lazy(() => import('views/test/cadreTest/collab/CollabFo')));
-const ManagerFo = Loadable(lazy(() => import('views/test/cadreTest/manager/ManagerFo')));
-const CollabNFo = Loadable(lazy(() => import('views/test/nonCadreTest/collab/CollabNFo')));
-const ManagerNFo = Loadable(lazy(() => import('views/test/nonCadreTest/manager/ManagerNFo')));
+// const CollabFo = Loadable(lazy(() => import('views/test/cadreTest/collab/CollabFo')));
+// const ManagerFo = Loadable(lazy(() => import('views/test/cadreTest/manager/ManagerFo')));
+// const CollabNFo = Loadable(lazy(() => import('views/test/nonCadreTest/collab/CollabNFo')));
+// const ManagerNFo = Loadable(lazy(() => import('views/test/nonCadreTest/manager/ManagerNFo')));
 
 // ==============================|| MAIN ROUTING ||============================== //
 
@@ -227,7 +230,7 @@ const MainRoutes = {
           element: <AssignationAll />
         }
       ]
-    },
+    }, 
 
     {
       path: 'import',
@@ -238,6 +241,16 @@ const MainRoutes = {
         }
       ]
     },
+
+    {
+      path: 'dashboardAdmin',
+      children: [
+        {
+          path: 'dashboard',
+          element: <DashboardAdmin />
+        }
+      ]
+    }, 
 
     {
       path: 'evaluation',
@@ -326,8 +339,8 @@ const MainRoutes = {
       path: 'manager',
       children: [
         {
-          path: 'fixation/:subordinateId/:typeUser',
-          element: <FixationCadre />
+          path: 'evaluationCadre/:subordinateId/:typeUser',
+          element: <ManagerCadre />
         }
       ]
     },
@@ -335,8 +348,8 @@ const MainRoutes = {
       path: 'manager',
       children: [
         {
-          path: 'fixationNonCadre/:subordinateId/:typeUser',
-          element: <FixationNonCadre />
+          path: 'evaluationNonCadre/:subordinateId/:typeUser',
+          element: <ManagerNonCadre />
         }
       ]
     },
@@ -456,42 +469,42 @@ const MainRoutes = {
     },
 
     //test 
-    {
-      path: 'test',
-      children: [
-        {
-          path: 'collabFo',
-          element: <CollabFo />
-        }
-      ]
-    },
-    {
-      path: 'test',
-      children: [
-        {
-          path: 'managerFo',
-          element: <ManagerFo />
-        }
-      ]
-    },
-    {
-      path: 'test',
-      children: [
-        {
-          path: 'collabNFo',
-          element: <CollabNFo />
-        }
-      ]
-    },
-    {
-      path: 'test',
-      children: [
-        {
-          path: 'managerNFo',
-          element: <ManagerNFo />
-        }
-      ]
-    }
+    // {
+    //   path: 'test',
+    //   children: [
+    //     {
+    //       path: 'collabFo',
+    //       element: <CollabFo />
+    //     }
+    //   ]
+    // },
+    // {
+    //   path: 'test',
+    //   children: [
+    //     {
+    //       path: 'managerFo',
+    //       element: <ManagerFo />
+    //     }
+    //   ]
+    // },
+    // {
+    //   path: 'test',
+    //   children: [
+    //     {
+    //       path: 'collabNFo',
+    //       element: <CollabNFo />
+    //     }
+    //   ]
+    // },
+    // {
+    //   path: 'test',
+    //   children: [
+    //     {
+    //       path: 'managerNFo',
+    //       element: <ManagerNFo />
+    //     }
+    //   ]
+    // }
   ]
 };
 

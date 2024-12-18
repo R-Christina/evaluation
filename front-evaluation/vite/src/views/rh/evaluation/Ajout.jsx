@@ -137,6 +137,7 @@ const Ajout = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     const validationErrors = validate();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
@@ -148,7 +149,7 @@ const Ajout = () => {
     try {
       const response = await formulaireInstance.post(`/Periode?userId=${userId}`, formData);
 
-      if (response.data.Success) {
+      if (response.data.success) {
         setBackendErrors([]);
         setIsDataUpdated(true);
 
@@ -164,7 +165,7 @@ const Ajout = () => {
           type: '',
         });
 
-        navigate('/evaluation/listeEvaluation');
+          navigate('/evaluation/listeEvaluation');
       } else {
         // Dans le cas où le backend retourne Success: false avec HTTP 200
         setBackendErrors(response.data.errors || []);

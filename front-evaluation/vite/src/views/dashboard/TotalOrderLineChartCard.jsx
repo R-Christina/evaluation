@@ -1,169 +1,132 @@
 import PropTypes from 'prop-types';
 import React from 'react';
 
-// material-ui
+// Material-UI
 import { useTheme } from '@mui/material/styles';
-import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
+import IconButton from '@mui/material/IconButton';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
-// third-party
-import Chart from 'react-apexcharts';
+// Third-party
+import { format, startOfMonth, endOfMonth, startOfWeek, addDays, addMonths } from 'date-fns';
 
-// project imports
-import MainCard from 'ui-component/cards/MainCard';
-import SkeletonTotalOrderCard from 'ui-component/cards/Skeleton/EarningCard';
+// Project imports
+import MainCard from 'ui-component/cards/MainCard'; // Assurez-vous que ce chemin est correct
 
-import ChartDataMonth from './chart-data/total-order-month-line-chart';
-import ChartDataYear from './chart-data/total-order-year-line-chart';
+// ==============================|| CALENDRIER - PETIT CALENDRIER ULTRA COMPACT ||============================== //
 
-// assets
-import LocalMallOutlinedIcon from '@mui/icons-material/LocalMallOutlined';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-
-// ==============================|| DASHBOARD - TOTAL ORDER LINE CHART CARD ||============================== //
-
-const TotalOrderLineChartCard = ({ isLoading }) => {
+const SmallCalendarCard = ({ isLoading }) => {
   const theme = useTheme();
+  const [currentMonth, setCurrentMonth] = React.useState(new Date());
 
-  const [timeValue, setTimeValue] = React.useState(false);
-  const handleChangeTime = (event, newValue) => {
-    setTimeValue(newValue);
+  // Fonctions de navigation
+  const handlePrevMonth = () => {
+    setCurrentMonth((prev) => addMonths(prev, -1));
   };
 
+  const handleNextMonth = () => {
+    setCurrentMonth((prev) => addMonths(prev, 1));
+  };
+
+  // Calcul des dates
+  const startDate = startOfMonth(currentMonth);
+  const endDate = endOfMonth(currentMonth);
+  const startWeek = startOfWeek(startDate, { weekStartsOn: 1 }); // Semaine commence le lundi
+
+  const dates = [];
+  for (let i = 0; i < 42; i++) {
+    // 6 semaines pour couvrir tous les jours
+    dates.push(addDays(startWeek, i));
+  }
+
+  // Jours de la semaine
+  const daysOfWeek = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'];
+
   return (
-    <>
-      {isLoading ? (
-        <SkeletonTotalOrderCard />
-      ) : (
-        <MainCard
-          border={false}
-          content={false}
-          sx={{
-            bgcolor: 'primary.dark',
-            color: '#fff',
-            overflow: 'hidden',
-            position: 'relative',
-            '&>div': {
-              position: 'relative',
-              zIndex: 5
-            },
-            '&:after': {
-              content: '""',
-              position: 'absolute',
-              width: 210,
-              height: 210,
-              background: theme.palette.primary[800],
-              borderRadius: '50%',
-              top: { xs: -105, sm: -85 },
-              right: { xs: -140, sm: -95 }
-            },
-            '&:before': {
-              content: '""',
-              position: 'absolute',
-              width: 210,
-              height: 210,
-              background: theme.palette.primary[800],
-              borderRadius: '50%',
-              top: { xs: -155, sm: -125 },
-              right: { xs: -70, sm: -15 },
-              opacity: 0.5
-            }
-          }}
-        >
-          <Box sx={{ p: 2.25 }}>
-            <Grid container direction="column">
-              <Grid item>
-                <Grid container justifyContent="space-between">
-                  <Grid item>
-                    <Avatar
-                      variant="rounded"
-                      sx={{
-                        ...theme.typography.commonAvatar,
-                        ...theme.typography.largeAvatar,
-                        bgcolor: 'primary.800',
-                        color: '#fff',
-                        mt: 1
-                      }}
-                    >
-                      <LocalMallOutlinedIcon fontSize="inherit" />
-                    </Avatar>
-                  </Grid>
-                  <Grid item>
-                    <Button
-                      disableElevation
-                      variant={timeValue ? 'contained' : 'text'}
-                      size="small"
-                      sx={{ color: 'inherit' }}
-                      onClick={(e) => handleChangeTime(e, true)}
-                    >
-                      Month
-                    </Button>
-                    <Button
-                      disableElevation
-                      variant={!timeValue ? 'contained' : 'text'}
-                      size="small"
-                      sx={{ color: 'inherit' }}
-                      onClick={(e) => handleChangeTime(e, false)}
-                    >
-                      Year
-                    </Button>
-                  </Grid>
-                </Grid>
-              </Grid>
-              <Grid item sx={{ mb: 0.75 }}>
-                <Grid container alignItems="center">
-                  <Grid item xs={6}>
-                    <Grid container alignItems="center">
-                      <Grid item>
-                        {timeValue ? (
-                          <Typography sx={{ fontSize: '2.125rem', fontWeight: 500, mr: 1, mt: 1.75, mb: 0.75 }}>$108</Typography>
-                        ) : (
-                          <Typography sx={{ fontSize: '2.125rem', fontWeight: 500, mr: 1, mt: 1.75, mb: 0.75 }}>$961</Typography>
-                        )}
-                      </Grid>
-                      <Grid item>
-                        <Avatar
-                          sx={{
-                            ...theme.typography.smallAvatar,
-                            cursor: 'pointer',
-                            bgcolor: 'primary.200',
-                            color: 'primary.dark'
-                          }}
-                        >
-                          <ArrowDownwardIcon fontSize="inherit" sx={{ transform: 'rotate3d(1, 1, 1, 45deg)' }} />
-                        </Avatar>
-                      </Grid>
-                      <Grid item xs={12}>
-                        <Typography
-                          sx={{
-                            fontSize: '1rem',
-                            fontWeight: 500,
-                            color: 'primary.200'
-                          }}
-                        >
-                          Total Order
-                        </Typography>
-                      </Grid>
-                    </Grid>
-                  </Grid>
-                  <Grid item xs={6}>
-                    {timeValue ? <Chart {...ChartDataMonth} /> : <Chart {...ChartDataYear} />}
-                  </Grid>
-                </Grid>
+    <MainCard border={false} content={false} sx={{ maxWidth: 420, padding: 1 }}>
+      <Box sx={{ p: 0.8 }}>
+        {isLoading ? (
+          <Typography variant="caption">Chargement...</Typography>
+        ) : (
+          <Grid container direction="column" spacing={0.5}>
+            {/* En-tête du calendrier avec navigation */}
+            <Grid item>
+              <Grid container alignItems="center" justifyContent="space-between">
+                <Typography variant="caption" sx={{ fontWeight: 600, color: '#3f51b5' }}>
+                  {format(currentMonth, 'MMMM yyyy')}
+                </Typography>
+                <Box>
+                  <IconButton onClick={handlePrevMonth} size="small" sx={{ p: 0.3 }}>
+                    <ChevronLeftIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton onClick={handleNextMonth} size="small" sx={{ p: 0.3 }}>
+                    <ChevronRightIcon fontSize="small" />
+                  </IconButton>
+                </Box>
               </Grid>
             </Grid>
-          </Box>
-        </MainCard>
-      )}
-    </>
+
+            {/* Jours de la semaine */}
+            <Grid item>
+              <Grid container columns={7} spacing={0}>
+                {daysOfWeek.map((day, index) => (
+                  <Grid item xs={1} key={index}>
+                    <Typography variant="caption" align="center" sx={{ fontWeight: 500, fontSize: '0.6rem' }}>
+                      {day}
+                    </Typography>
+                  </Grid>
+                ))}
+              </Grid>
+            </Grid>
+
+            {/* Dates du mois */}
+            <Grid item>
+              <Grid container columns={7} spacing={0.1}>
+                {dates.map((day, index) => {
+                  const isCurrentMonth = day.getMonth() === currentMonth.getMonth();
+                  const isToday = day.toDateString() === new Date().toDateString();
+
+                  return (
+                    <Grid item xs={1} key={index}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          height: 20,
+                          bgcolor: isToday
+                            ? theme.palette.primary.light
+                            : isCurrentMonth
+                              ? theme.palette.background.paper
+                              : theme.palette.grey[200], // Fond gris pour ceux encadrés
+                          color: isCurrentMonth ? theme.palette.text.primary : theme.palette.grey[600], // Texte gris
+                          cursor: isCurrentMonth ? 'pointer' : 'default',
+                          '&:hover': {
+                            bgcolor: isCurrentMonth ? theme.palette.primary.light : theme.palette.grey[300] // Légère variation au survol
+                          }
+                        }}
+                      >
+                        <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>
+                          {format(day, 'd')}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  );
+                })}
+              </Grid>
+            </Grid>
+          </Grid>
+        )}
+      </Box>
+    </MainCard>
   );
 };
 
-TotalOrderLineChartCard.propTypes = {
+SmallCalendarCard.propTypes = {
   isLoading: PropTypes.bool
 };
 
-export default TotalOrderLineChartCard;
+export default SmallCalendarCard;

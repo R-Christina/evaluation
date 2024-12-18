@@ -138,9 +138,9 @@ const Subordonne = () => {
 
   const handleFlagClick = (subordinateId, typeUser) => {
     if (typeUser === 'Cadre') {
-      navigate(`/manager/fixation/${subordinateId}/${typeUser}`);
+      navigate(`/manager/evaluationCadre/${subordinateId}/${typeUser}`);
     } else if (typeUser === 'NonCadre') {
-      navigate(`/manager/fixationNonCadre/${subordinateId}/${typeUser}`);
+      navigate(`/manager/evaluationNonCadre/${subordinateId}/${typeUser}`);
     }
   };
 

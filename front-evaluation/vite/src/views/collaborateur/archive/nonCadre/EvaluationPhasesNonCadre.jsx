@@ -1,4 +1,4 @@
-import React, { useState, useEffect , useRef} from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -14,11 +14,12 @@ import {
   TableHead,
   TableRow,
   styled,
-  IconButton
+  IconButton,
+  Alert // Importer Alert pour afficher les messages d'erreur
 } from '@mui/material';
 import FolderIcon from '@mui/icons-material/Folder';
 import MainCard from 'ui-component/cards/MainCard';
-import { formulaireInstance } from '../../../../axiosConfig';
+import { formulaireInstance, authInstance } from '../../../../axiosConfig'; // Assurez-vous que authInstance est importé
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import { useParams } from 'react-router-dom';
 import jsPDF from 'jspdf';
@@ -53,17 +54,22 @@ function EvaluationPhasesNonCadre() {
   const [scoreData, setScoreData] = useState(null);
   const [evaluationDetails, setEvaluationDetails] = useState(null);
   const user = JSON.parse(localStorage.getItem('user')) || {};
-  const userNon = user.name;
-  const poste = user.poste;
-  const departement = user.department;
-  const superiorName = user.superiorName;
+  const userNon = user.name || 'Utilisateur';
+  const poste = user.poste || 'N/A';
+  const departement = user.department || 'N/A';
+  const superiorName = user.superiorName || 'N/A';
+  const superiorId = user.superiorId || null; // Assurez-vous que superiorId est disponible
 
   const printRef = useRef();
 
   const [helpContents, setHelpContents] = useState([]);
+  const [isContentVisible, setIsContentVisible] = useState(true);
+  const [errorMessage, setErrorMessage] = useState(''); // Ajouté pour gérer les messages d'erreur
+
+  const [userSignature, setUserSignature] = useState(null); // Signature du collaborateur
+  const [managerSignature, setManagerSignature] = useState(null); // Signature du manager
 
   const phases = ['Fixation Objectif', 'Mi-Parcours', 'Finale'];
-  const [isContentVisible, setIsContentVisible] = useState(true);
 
   const groupedIndicators =
     historyByPhase?.indicators?.reduce((acc, indicator) => {
@@ -81,7 +87,7 @@ function EvaluationPhasesNonCadre() {
       });
       setHelpContents(response.data);
     } catch (err) {
-      setError(err.response?.data?.Message || "Erreur lors de la récupération des contenus d'aide.");
+      setErrorMessage(err.response?.data?.Message || "Erreur lors de la récupération des contenus d'aide."); // Utilisation correcte de setErrorMessage
     }
   };
 
@@ -97,16 +103,21 @@ function EvaluationPhasesNonCadre() {
         setFormTemplate(response.data);
       } catch (error) {
         console.error('Error fetching form template:', error);
+        setErrorMessage('Erreur lors du chargement du template.'); // Gestion des erreurs
       }
     };
     fetchTemplate();
   }, [templateId]);
 
   useEffect(() => {
-    // Charger la phase "Fixation" par défaut
-    handlePhaseClick('Fixation Objectif');
-    fetchEvaluationDetails();
-    fetchHelpContents();
+    const initialize = async () => {
+      await handlePhaseClick('Fixation Objectif'); // Charger la phase "Fixation Objectif" par défaut
+      await fetchEvaluationDetails();
+      await fetchHelpContents();
+      await fetchSignatures(); // Récupérer les signatures après l'initialisation
+    };
+    initialize();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchEvaluationDetails = async () => {
@@ -116,15 +127,48 @@ function EvaluationPhasesNonCadre() {
         setEvaluationDetails(response.data);
       } else {
         console.error('Unexpected response structure:', response);
+        setErrorMessage('Structure de réponse inattendue pour les détails de l\'évaluation.');
       }
     } catch (error) {
       console.error('Error fetching evaluation details:', error);
+      setErrorMessage('Erreur lors de la récupération des détails de l\'évaluation.');
+    }
+  };
+
+  const fetchSignatures = async () => {
+    if (!userId || !superiorId) {
+      console.error('userId ou superiorId est manquant.');
+      setErrorMessage('Informations utilisateur manquantes pour récupérer les signatures.');
+      return;
+    }
+    try {
+      // Récupérer la signature de l'utilisateur
+      const userResponse = await authInstance.get(`/Signature/get-user-signature/${userId}`);
+      if (userResponse && userResponse.data) {
+        setUserSignature(userResponse.data.signature);
+      } else {
+        console.error('Structure de réponse inattendue pour la signature de l\'utilisateur:', userResponse);
+        setErrorMessage('Signature du collaborateur indisponible.');
+      }
+
+      // Récupérer la signature du manager
+      const managerResponse = await authInstance.get(`/Signature/get-user-signature/${superiorId}`);
+      if (managerResponse && managerResponse.data) {
+        setManagerSignature(managerResponse.data.signature);
+      } else {
+        console.error('Structure de réponse inattendue pour la signature du manager:', managerResponse);
+        setErrorMessage('Signature du manager indisponible.');
+      }
+    } catch (error) {
+      console.error('Erreur lors de la récupération des signatures:', error);
+      setErrorMessage('Erreur lors de la récupération des signatures.');
     }
   };
 
   const handlePhaseClick = async (phase) => {
     setActivePhase(phase);
     setIsContentVisible(false); // Animation de sortie
+    setErrorMessage(''); // Réinitialiser le message d'erreur
 
     setTimeout(async () => {
       try {
@@ -139,6 +183,7 @@ function EvaluationPhasesNonCadre() {
         if (scoreResponse?.data) setScoreData(scoreResponse.data);
       } catch (error) {
         console.error('Error fetching phase data:', error);
+        setErrorMessage('Pas encore de donnée disponible');
       } finally {
         setIsContentVisible(true); // Animation d'entrée
       }
@@ -165,13 +210,14 @@ function EvaluationPhasesNonCadre() {
       })
       .catch((err) => {
         console.error('Erreur lors de la génération du PDF', err);
+        setErrorMessage('Erreur lors de la génération du PDF.');
       });
   };
 
   return (
     <Paper>
       <MainCard>
-      <Grid container alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
+        <Grid container alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
           <Grid item>
             <Typography variant="subtitle2">Archive</Typography>
             <Typography variant="h3" sx={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
@@ -225,6 +271,18 @@ function EvaluationPhasesNonCadre() {
             </Typography>
           )}
 
+          {errorMessage ? (
+            <Alert
+              severity="info"
+              sx={{
+                textAlign: 'center',
+                marginBottom: 3
+              }}
+            >
+              {errorMessage}
+            </Alert>
+          ) : (
+            <>
           <Grid container spacing={4} sx={{ mb: 3, mt: 2 }}>
             <Grid item xs={6}>
               <Paper sx={{ padding: 2, borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
@@ -235,7 +293,7 @@ function EvaluationPhasesNonCadre() {
                 <Typography variant="body1">
                   Nom : <span style={{ color: '#3949AB' }}>{userNon}</span>
                 </Typography>
-                <Typography variant="body1">Matricule :</Typography>
+                <Typography variant="body1">Matricule : {user.matricule || 'N/A'}</Typography>
                 <Typography variant="body1">
                   Poste : <span style={{ color: '#3949AB' }}>{poste}</span>
                 </Typography>
@@ -257,6 +315,7 @@ function EvaluationPhasesNonCadre() {
             </Grid>
           </Grid>
 
+          {/* Table des Indicateurs de Capacités et de Compétences */}
           <TableContainer component={Paper} sx={{ mb: 4, borderRadius: 0 }}>
             <Table>
               <TableHead>
@@ -310,6 +369,7 @@ function EvaluationPhasesNonCadre() {
             </Table>
           </TableContainer>
 
+          {/* Table des Indicateurs Métiers */}
           <TableContainer component={Paper} sx={{ mb: 4, borderRadius: 0 }}>
             <Table sx={{ tableLayout: 'fixed', width: '100%' }}>
               <TableHead>
@@ -359,6 +419,7 @@ function EvaluationPhasesNonCadre() {
             </Table>
           </TableContainer>
 
+          {/* Ligne de Pondération Totale et Performance du Contrat d'Objectifs */}
           <TableContainer component={Paper} sx={{ borderRadius: 0, mt: 5 }}>
             <Table sx={{ tableLayout: 'fixed', width: '100%' }}>
               <TableBody>
@@ -380,6 +441,7 @@ function EvaluationPhasesNonCadre() {
             </Table>
           </TableContainer>
 
+          {/* Affichage des Contenus d'Aide pour la phase Finale */}
           {activePhase === 'Finale' && helpContents.length > 0 && (
             <MainCard sx={{ mt: 3, p: 2, backgroundColor: '#E8F5E9' }}>
               <Typography variant="h5" sx={{ color: '#2E7D32', mb: 2 }}>
@@ -406,6 +468,7 @@ function EvaluationPhasesNonCadre() {
             </MainCard>
           )}
 
+          {/* Affichage des Dates Importantes */}
           <Grid container sx={{ mt: 4, justifyContent: 'space-between' }}>
             <Grid item xs={12}>
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
@@ -438,19 +501,43 @@ function EvaluationPhasesNonCadre() {
             </Grid>
           </Grid>
 
+          {/* Affichage des Signatures */}
           <Grid container sx={{ mt: 2 }} spacing={4}>
             <Grid item xs={6} sx={{ textAlign: 'center' }}>
               <Typography variant="body1">Signature Collaborateur</Typography>
-              <Box sx={{ height: '50px', border: '1px solid black' }} />
+              <Box sx={{ height: '50px', border: '1px solid black', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {userSignature ? (
+                  <img
+                    src={`data:image/png;base64,${userSignature}`}
+                    alt="Signature Collaborateur"
+                    style={{ maxWidth: '100%', maxHeight: '100%' }}
+                  />
+                ) : (
+                  <Typography variant="caption">Signature indisponible</Typography>
+                )}
+              </Box>
             </Grid>
             <Grid item xs={6} sx={{ textAlign: 'center' }}>
               <Typography variant="body1">Signature Manager</Typography>
-              <Box sx={{ height: '50px', border: '1px solid black' }} />
+              <Box sx={{ height: '50px', border: '1px solid black', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {managerSignature ? (
+                  <img
+                    src={`data:image/png;base64,${managerSignature}`}
+                    alt="Signature Manager"
+                    style={{ maxWidth: '100%', maxHeight: '100%' }}
+                  />
+                ) : (
+                  <Typography variant="caption">Signature indisponible</Typography>
+                )}
+              </Box>
             </Grid>
           </Grid>
+          </>
+          )}
         </Box>
       </MainCard>
     </Paper>
   );
 }
+
 export default EvaluationPhasesNonCadre;

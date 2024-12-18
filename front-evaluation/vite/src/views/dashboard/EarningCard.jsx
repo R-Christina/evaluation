@@ -1,184 +1,149 @@
 import PropTypes from 'prop-types';
-import React from 'react';
-
-// material-ui
+import React, { useEffect, useState } from 'react';
 import { useTheme } from '@mui/material/styles';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
-import Grid from '@mui/material/Grid';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
 import Typography from '@mui/material/Typography';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import GroupIcon from '@mui/icons-material/Group'; // Remplacement de PersonIcon par GroupIcon
+import axios from 'axios';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
+import { authInstance } from '../../axiosConfig';
 
-// project imports
-import MainCard from 'ui-component/cards/MainCard';
-import SkeletonEarningCard from 'ui-component/cards/Skeleton/EarningCard';
-
-// assets
-import EarningIcon from 'assets/images/icons/earning.svg';
-import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import GetAppTwoToneIcon from '@mui/icons-material/GetAppOutlined';
-import FileCopyTwoToneIcon from '@mui/icons-material/FileCopyOutlined';
-import PictureAsPdfTwoToneIcon from '@mui/icons-material/PictureAsPdfOutlined';
-import ArchiveTwoToneIcon from '@mui/icons-material/ArchiveOutlined';
-
-// ===========================|| DASHBOARD DEFAULT - EARNING CARD ||=========================== //
-
-const EarningCard = ({ isLoading }) => {
+/**
+ * Composant UserCard qui affiche le nombre de collaborateurs directs d'un supérieur.
+ *
+ * @param {string} superiorId - L'ID du supérieur pour lequel récupérer le nombre de collaborateurs.
+ * @param {string} label - Le label à afficher sous le nombre de collaborateurs.
+ */
+const UserCard = ({ superiorId, label }) => {
   const theme = useTheme();
 
-  const [anchorEl, setAnchorEl] = React.useState(null);
+  // États locaux pour la gestion des données, du chargement et des erreurs
+  const [userCount, setUserCount] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const user = JSON.parse(localStorage.getItem('user')) || {};
+  const userId = user.id;
 
-  const handleClick = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
+  // Effet pour récupérer le nombre de collaborateurs lorsque le composant monte ou que superiorId change
+  useEffect(() => {
+    const fetchUserCount = async () => {
+      try {
+        // Remplacez l'URL par celle de votre API backend
+        const response = await authInstance.get(`/StatUser/user/subordinates/count`, {
+          params: { superiorId: userId },
+        });
+        setUserCount(response.data);
+      } catch (err) {
+        console.error('Erreur lors de la récupération du nombre de collaborateurs:', err);
+        setError('Impossible de charger les données.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
+    fetchUserCount();
+  }, [userId]);
 
+  // Affichage en cours de chargement
+  if (loading) {
+    return (
+      <Card
+        sx={{
+          height: '100%',
+          borderRadius: 2,
+          boxShadow: 2,
+          overflow: 'hidden',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 2,
+        }}
+      >
+        <CircularProgress />
+      </Card>
+    );
+  }
+
+  // Affichage en cas d'erreur
+  if (error) {
+    return (
+      <Card
+        sx={{
+          height: '100%',
+          borderRadius: 2,
+          boxShadow: 2,
+          overflow: 'hidden',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 2,
+          bgcolor: theme.palette.error.light,
+        }}
+      >
+        <Alert severity="error">{error}</Alert>
+      </Card>
+    );
+  }
+
+  // Affichage des données récupérées
   return (
-    <>
-      {isLoading ? (
-        <SkeletonEarningCard />
-      ) : (
-        <MainCard
-          border={false}
-          content={false}
+    <Card
+      sx={{
+        height: '100%',
+        borderRadius: 2,
+        overflow: 'hidden',
+        display: 'flex',
+      }}
+    >
+      {/* Partie Gauche (Icône) */}
+      <Box
+        sx={{
+          width: '50%',
+          bgcolor: theme.palette.primary.main,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <Avatar
           sx={{
-            bgcolor: 'secondary.dark',
-            color: '#fff',
-            overflow: 'hidden',
-            position: 'relative',
-            '&:after': {
-              content: '""',
-              position: 'absolute',
-              width: 210,
-              height: 210,
-              background: theme.palette.secondary[800],
-              borderRadius: '50%',
-              top: { xs: -105, sm: -85 },
-              right: { xs: -140, sm: -95 }
-            },
-            '&:before': {
-              content: '""',
-              position: 'absolute',
-              width: 210,
-              height: 210,
-              background: theme.palette.secondary[800],
-              borderRadius: '50%',
-              top: { xs: -155, sm: -125 },
-              right: { xs: -70, sm: -15 },
-              opacity: 0.5
-            }
+            bgcolor: theme.palette.primary.dark,
+            width: 48,
+            height: 48,
           }}
         >
-          <Box sx={{ p: 2.25 }}>
-            <Grid container direction="column">
-              <Grid item>
-                <Grid container justifyContent="space-between">
-                  <Grid item>
-                    <Avatar
-                      variant="rounded"
-                      sx={{
-                        ...theme.typography.commonAvatar,
-                        ...theme.typography.largeAvatar,
-                        bgcolor: 'secondary.800',
-                        mt: 1
-                      }}
-                    >
-                      <img src={EarningIcon} alt="Notification" />
-                    </Avatar>
-                  </Grid>
-                  <Grid item>
-                    <Avatar
-                      variant="rounded"
-                      sx={{
-                        ...theme.typography.commonAvatar,
-                        ...theme.typography.mediumAvatar,
-                        bgcolor: 'secondary.dark',
-                        color: 'secondary.200',
-                        zIndex: 1
-                      }}
-                      aria-controls="menu-earning-card"
-                      aria-haspopup="true"
-                      onClick={handleClick}
-                    >
-                      <MoreHorizIcon fontSize="inherit" />
-                    </Avatar>
-                    <Menu
-                      id="menu-earning-card"
-                      anchorEl={anchorEl}
-                      keepMounted
-                      open={Boolean(anchorEl)}
-                      onClose={handleClose}
-                      variant="selectedMenu"
-                      anchorOrigin={{
-                        vertical: 'bottom',
-                        horizontal: 'right'
-                      }}
-                      transformOrigin={{
-                        vertical: 'top',
-                        horizontal: 'right'
-                      }}
-                    >
-                      <MenuItem onClick={handleClose}>
-                        <GetAppTwoToneIcon sx={{ mr: 1.75 }} /> Import Card
-                      </MenuItem>
-                      <MenuItem onClick={handleClose}>
-                        <FileCopyTwoToneIcon sx={{ mr: 1.75 }} /> Copy Data
-                      </MenuItem>
-                      <MenuItem onClick={handleClose}>
-                        <PictureAsPdfTwoToneIcon sx={{ mr: 1.75 }} /> Export
-                      </MenuItem>
-                      <MenuItem onClick={handleClose}>
-                        <ArchiveTwoToneIcon sx={{ mr: 1.75 }} /> Archive File
-                      </MenuItem>
-                    </Menu>
-                  </Grid>
-                </Grid>
-              </Grid>
-              <Grid item>
-                <Grid container alignItems="center">
-                  <Grid item>
-                    <Typography sx={{ fontSize: '2.125rem', fontWeight: 500, mr: 1, mt: 1.75, mb: 0.75 }}>$500.00</Typography>
-                  </Grid>
-                  <Grid item>
-                    <Avatar
-                      sx={{
-                        cursor: 'pointer',
-                        ...theme.typography.smallAvatar,
-                        bgcolor: 'secondary.200',
-                        color: 'secondary.dark'
-                      }}
-                    >
-                      <ArrowUpwardIcon fontSize="inherit" sx={{ transform: 'rotate3d(1, 1, 1, 45deg)' }} />
-                    </Avatar>
-                  </Grid>
-                </Grid>
-              </Grid>
-              <Grid item sx={{ mb: 1.25 }}>
-                <Typography
-                  sx={{
-                    fontSize: '1rem',
-                    fontWeight: 500,
-                    color: 'secondary.200'
-                  }}
-                >
-                  Total Earning
-                </Typography>
-              </Grid>
-            </Grid>
-          </Box>
-        </MainCard>
-      )}
-    </>
+          <GroupIcon fontSize="large" sx={{ color: '#fff' }} /> {/* Utilisation de GroupIcon */}
+        </Avatar>
+      </Box>
+
+      {/* Partie Droite (Contenu) */}
+      <CardContent
+        sx={{
+          width: '75%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          px: 2,
+        }}
+      >
+        <Typography variant="h3" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+          {userCount}
+        </Typography>
+        <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
+          Nombre de vos collaborateurs directs
+        </Typography>
+      </CardContent>
+    </Card>
   );
 };
 
-EarningCard.propTypes = {
-  isLoading: PropTypes.bool
+UserCard.propTypes = {
+  superiorId: PropTypes.string.isRequired,
+  label: PropTypes.string.isRequired,
 };
 
-export default EarningCard;
+export default UserCard;

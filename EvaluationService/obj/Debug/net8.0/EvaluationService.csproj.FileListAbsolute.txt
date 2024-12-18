@@ -54,6 +54,7 @@ D:\evaluation\EvaluationService\bin\Debug\net8.0\System.Configuration.Configurat
 D:\evaluation\EvaluationService\bin\Debug\net8.0\System.Drawing.Common.dll
 D:\evaluation\EvaluationService\bin\Debug\net8.0\System.IdentityModel.Tokens.Jwt.dll
 D:\evaluation\EvaluationService\bin\Debug\net8.0\System.Memory.Data.dll
+D:\evaluation\EvaluationService\bin\Debug\net8.0\System.Net.WebSockets.WebSocketProtocol.dll
 D:\evaluation\EvaluationService\bin\Debug\net8.0\System.Runtime.Caching.dll
 D:\evaluation\EvaluationService\bin\Debug\net8.0\System.Security.Cryptography.ProtectedData.dll
 D:\evaluation\EvaluationService\bin\Debug\net8.0\System.Security.Permissions.dll
@@ -146,4 +147,3 @@ D:\evaluation\EvaluationService\obj\Debug\net8.0\refint\EvaluationService.dll
 D:\evaluation\EvaluationService\obj\Debug\net8.0\EvaluationService.pdb
 D:\evaluation\EvaluationService\obj\Debug\net8.0\EvaluationService.genruntimeconfig.cache
 D:\evaluation\EvaluationService\obj\Debug\net8.0\ref\EvaluationService.dll
-D:\evaluation\EvaluationService\bin\Debug\net8.0\System.Net.WebSockets.WebSocketProtocol.dll

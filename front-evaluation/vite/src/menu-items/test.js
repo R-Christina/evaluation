@@ -12,22 +12,22 @@ const test = {
   title: 'Test',
   type: 'group',
   children: [
-    {
-      id: 'testCadre',
-      title: 'Test Cadre',
-      type: 'item',
-      url: '/test/collabFo',
-      icon: icons.IconFileZip,
-      breadcrumbs: false
-    },
-    {
-      id: 'testNonCadre',
-      title: 'Test Non Cadre',
-      type: 'item',
-      url: '/test/collabNFo',
-      icon: icons.IconFileZip,
-      breadcrumbs: false
-    },
+    // {
+    //   id: 'testCadre',
+    //   title: 'Test Cadre',
+    //   type: 'item',
+    //   url: '/test/collabFo',
+    //   icon: icons.IconFileZip,
+    //   breadcrumbs: false
+    // },
+    // {
+    //   id: 'testNonCadre',
+    //   title: 'Test Non Cadre',
+    //   type: 'item',
+    //   url: '/test/collabNFo',
+    //   icon: icons.IconFileZip,
+    //   breadcrumbs: false
+    // },
   ]
 };
 

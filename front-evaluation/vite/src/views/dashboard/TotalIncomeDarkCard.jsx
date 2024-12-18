@@ -1,4 +1,6 @@
 import PropTypes from 'prop-types';
+import React, { useEffect, useState } from 'react';
+import { authInstance } from '../../axiosConfig';
 
 // material-ui
 import { styled, useTheme } from '@mui/material/styles';
@@ -15,14 +17,16 @@ import MainCard from 'ui-component/cards/MainCard';
 import TotalIncomeCard from 'ui-component/cards/Skeleton/TotalIncomeCard';
 
 // assets
-import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
+// import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount'; // New icon for "Cadre"
+// Alternatively, you can use:
+import WorkIcon from '@mui/icons-material/Work';
 
-// styles
 const CardWrapper = styled(MainCard)(({ theme }) => ({
   backgroundColor: theme.palette.primary.dark,
   color: theme.palette.primary.light,
   overflow: 'hidden',
   position: 'relative',
+  minHeight: '90px',
   '&:after': {
     content: '""',
     position: 'absolute',
@@ -45,14 +49,33 @@ const CardWrapper = styled(MainCard)(({ theme }) => ({
   }
 }));
 
-// ==============================|| DASHBOARD - TOTAL INCOME DARK CARD ||============================== //
+// ==============================|| DASHBOARD - CADRES COUNT DARK CARD ||============================== //
 
-const TotalIncomeDarkCard = ({ isLoading }) => {
+const CadresCountDarkCard = ({ isLoading }) => {
   const theme = useTheme();
+  const [cadresCount, setCadresCount] = useState(null);
+
+  const user = JSON.parse(localStorage.getItem('user')) || {};
+  const managerId = user.id;
+
+  useEffect(() => {
+    const fetchCadresCount = async () => {
+      try {
+        const response = await authInstance.get(`/StatUser/user/subordinates/countType?superiorId=${managerId}`);
+        setCadresCount(response.data.cadresCount);  // Assuming the API returns the count as 'CadresCount'
+      } catch (error) {
+        console.error('Error fetching cadres count:', error);
+      }
+    };
+
+    if (managerId) {
+      fetchCadresCount();
+    }
+  }, [managerId]);
 
   return (
     <>
-      {isLoading ? (
+      {isLoading || cadresCount === null ? (
         <TotalIncomeCard />
       ) : (
         <CardWrapper border={false} content={false}>
@@ -69,19 +92,19 @@ const TotalIncomeDarkCard = ({ isLoading }) => {
                       color: '#fff'
                     }}
                   >
-                    <TableChartOutlinedIcon fontSize="inherit" />
+                    <WorkIcon fontSize="inherit" /> {/* New icon for Cadre */}
                   </Avatar>
                 </ListItemAvatar>
                 <ListItemText
                   sx={{ py: 0, my: 0.45 }}
                   primary={
                     <Typography variant="h4" sx={{ color: '#fff' }}>
-                      $203k
+                      {cadresCount} {/* Display the fetched count here */}
                     </Typography>
                   }
                   secondary={
                     <Typography variant="subtitle2" sx={{ color: 'primary.light', mt: 0.25 }}>
-                      Total Income
+                      Cadre direct
                     </Typography>
                   }
                 />
@@ -94,8 +117,9 @@ const TotalIncomeDarkCard = ({ isLoading }) => {
   );
 };
 
-TotalIncomeDarkCard.propTypes = {
+CadresCountDarkCard.propTypes = {
+  superiorId: PropTypes.string.isRequired, // Expected superior ID to fetch the count
   isLoading: PropTypes.bool
 };
 
-export default TotalIncomeDarkCard;
+export default CadresCountDarkCard;
